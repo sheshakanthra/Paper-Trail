@@ -4,6 +4,7 @@ dist-ssr
 *.local
 .env
 .env.*
+!.env.example
 server/data/
 .DS_Store
 .vscode/*

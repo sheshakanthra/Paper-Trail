@@ -3,6 +3,7 @@ import "dotenv/config";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { initNeo4j, neo4jEnabled, mirrorComplaint } from "./neo4j.js";
 
 const PORT = process.env.PORT || 8787;
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || "";
@@ -45,6 +46,11 @@ app.post("/api/complaints", (req, res) => {
   }
   try {
     writeStore(complaints);
+    // NEO4J seam: mirror into the graph when enabled. Fire-and-forget — the
+    // JSON store stays the source of truth, so a DB hiccup never fails the write.
+    if (neo4jEnabled()) {
+      for (const c of complaints) mirrorComplaint(c);
+    }
     res.json({ ok: true, count: complaints.length });
   } catch (err) {
     res.status(500).json({ error: err.message || "failed to write store" });
@@ -87,4 +93,5 @@ app.post("/api/claude", async (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`NyayaLoop API proxy listening on http://localhost:${PORT}`);
+  initNeo4j(); // no-op unless USE_NEO4J=true and vars are set
 });
