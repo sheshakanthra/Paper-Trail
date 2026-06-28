@@ -4,10 +4,13 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { initNeo4j, neo4jEnabled, mirrorComplaint } from "./neo4j.js";
+import rateLimit from "express-rate-limit";
 
 const PORT = process.env.PORT || 8787;
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || "";
 const ANTHROPIC_MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6";
+const CLAUDE_RATE_MAX = Number(process.env.CLAUDE_RATE_MAX || 20); // req/min/IP
+const BODY_LIMIT = process.env.BODY_LIMIT || "100kb";              // request body cap
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = path.join(__dirname, "data");
@@ -25,7 +28,17 @@ function writeStore(complaints) {
 }
 
 const app = express();
-app.use(express.json({ limit: "100kb" }));
+app.use(express.json({ limit: BODY_LIMIT }));
+
+/* Rate-limit the one route that spends money. A deployed instance can't be
+   hammered to drain the API key. Health + JSON store routes are untouched. */
+const claudeLimiter = rateLimit({
+  windowMs: 60_000,
+  max: CLAUDE_RATE_MAX,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "rate limit exceeded — try again in a minute" },
+});
 
 app.get("/api/health", (_req, res) => {
   res.json({ ok: true, keyLoaded: Boolean(ANTHROPIC_API_KEY) });
@@ -58,7 +71,7 @@ app.post("/api/complaints", (req, res) => {
 });
 
 /* Proxies a single Claude messages call. The browser never sees the API key. */
-app.post("/api/claude", async (req, res) => {
+app.post("/api/claude", claudeLimiter, async (req, res) => {
   if (!ANTHROPIC_API_KEY) {
     return res.status(503).json({ error: "ANTHROPIC_API_KEY not configured" });
   }
