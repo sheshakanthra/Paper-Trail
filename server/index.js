@@ -3,7 +3,7 @@ import "dotenv/config";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { initNeo4j, neo4jEnabled, mirrorComplaint } from "./neo4j.js";
+import { initNeo4j, neo4jEnabled, neo4jConnected, mirrorComplaint, getGraphStats } from "./neo4j.js";
 import rateLimit from "express-rate-limit";
 
 const PORT = process.env.PORT || 8787;
@@ -70,6 +70,22 @@ app.post("/api/complaints", (req, res) => {
   }
 });
 
+/* Read-side graph endpoint — per-department unresolved load and the live
+   escalation chains pressing on each official. A multi-hop traversal that's
+   awkward in SQL but native to the property graph. 503s (not 500s) when the
+   graph isn't connected, so the frontend can treat it as "feature off". */
+app.get("/api/graph/stats", async (_req, res) => {
+  if (!neo4jConnected()) {
+    return res.status(503).json({ error: "neo4j graph not connected", connected: false });
+  }
+  try {
+    const stats = await getGraphStats();
+    res.json({ connected: true, ...stats });
+  } catch (err) {
+    res.status(500).json({ error: err.message || "graph query failed", connected: true });
+  }
+});
+
 /* Proxies a single Claude messages call. The browser never sees the API key. */
 app.post("/api/claude", claudeLimiter, async (req, res) => {
   if (!ANTHROPIC_API_KEY) {
@@ -104,7 +120,9 @@ app.post("/api/claude", claudeLimiter, async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`NyayaLoop API proxy listening on http://localhost:${PORT}`);
-  initNeo4j(); // no-op unless USE_NEO4J=true and vars are set
+  // Await so the connected flag is settled (verifyConnectivity resolved/rejected)
+  // rather than racing the first request. No-op unless USE_NEO4J=true and vars set.
+  await initNeo4j();
 });

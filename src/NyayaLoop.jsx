@@ -197,6 +197,41 @@ async function aiRTI(c) {
   } catch { return base; }
 }
 
+/* ── Error boundary: the graph mirror is an optional enrichment. If anything in
+   the pressure-chain subtree throws, contain it here and show a fallback instead
+   of letting the whole React tree unmount (blank screen). ── */
+class GraphErrorBoundary extends React.Component {
+  constructor(props) { super(props); this.state = { failed: false }; }
+  static getDerivedStateFromError() { return { failed: true }; }
+  componentDidCatch(err) { console.warn("[graph] pressure-chain render error:", err?.message); }
+  render() {
+    if (this.state.failed) {
+      return (
+        <div style={{ background:T.panel, border:`1px solid ${T.line}`, borderRadius:12, padding:18, fontSize:12, color:T.dim }}>
+          The pressure-chain view hit an error and was contained. The rest of NyayaLoop is unaffected — reselect a complaint or switch tabs.
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+/* Fetch the Neo4j graph mirror stats. The graph is an OPTIONAL mirror — Aura's
+   free tier auto-pauses after ~3 days idle, so a 503 is a normal runtime state,
+   not an error. fetch() does NOT throw on 503/500, so we MUST check res.ok
+   before res.json(); on any non-200 we report the mirror unavailable and the UI
+   falls back to the local complaint-derived view. Never throws. */
+async function fetchGraphStats() {
+  try {
+    const res = await fetch("/api/graph/stats");
+    if (!res.ok) return { available: false, stats: null };
+    const data = await res.json();
+    return { available: data?.connected === true, stats: data ?? null };
+  } catch {
+    return { available: false, stats: null };
+  }
+}
+
 export default function NyayaLoop() {
   const [tab, setTab] = useState("file");
   const [complaints, setComplaints] = useState([]);
@@ -211,6 +246,8 @@ export default function NyayaLoop() {
   const [rtiOpen, setRtiOpen] = useState(null);   // complaint id whose RTI is shown
   const [rtiText, setRtiText] = useState("");
   const [rtiBusy, setRtiBusy] = useState(false);
+  const [graphAvailable, setGraphAvailable] = useState(false); // Neo4j mirror live?
+  const [graphStats, setGraphStats] = useState(null);          // {perDepartment, officialsUnderPressure}
   const recogRef = useRef(null);
   const hydratedRef = useRef(false);
 
@@ -245,6 +282,19 @@ export default function NyayaLoop() {
     }, 400);
     return () => clearTimeout(t);
   }, [complaints]);
+
+  /* Probe the optional Neo4j graph mirror. Re-probe whenever the store changes
+     (a new filing may have just been mirrored) and when the graph tab opens.
+     Uses the res.ok-gated helper so a 503 (Aura paused) degrades gracefully. */
+  useEffect(() => {
+    let cancelled = false;
+    fetchGraphStats().then(({ available, stats }) => {
+      if (cancelled) return;
+      setGraphAvailable(available);
+      setGraphStats(available ? stats : null);
+    });
+    return () => { cancelled = true; };
+  }, [complaints, tab]);
 
   useEffect(() => {
     if (!playing) return;
@@ -391,7 +441,11 @@ export default function NyayaLoop() {
 
       <div style={{ padding:20 }}>
         {tab==="file" && <FilePanel {...{lang,setLang,draft,setDraft,listening,startVoice,stopVoice,busy,fileComplaint,routeResult}} />}
-        {tab==="graph" && <GraphPanel {...{stats,complaints,selected,setSelectedId,resolve,day,openRTI}} />}
+        {tab==="graph" && (
+          <GraphErrorBoundary>
+            <GraphPanel {...{stats,complaints,selected,setSelectedId,resolve,day,openRTI,graphAvailable,graphStats}} />
+          </GraphErrorBoundary>
+        )}
         {tab==="pattern" && <Pattern {...{wardStats,best,worst}} />}
       </div>
 
@@ -478,16 +532,28 @@ function Row({ k, v }) {
 }
 
 /* ───── PRESSURE CHAIN (signature) ───── */
-function GraphPanel({ stats, complaints, selected, setSelectedId, resolve, day, openRTI }) {
+function GraphPanel({ stats, complaints, selected, setSelectedId, resolve, day, openRTI, graphAvailable, graphStats }) {
   const W=720, H=300, midY=120;
   const cit={x:60}, dept={x:185};
   const stageX=[330,455,575,680];
   const sel = selected && selected.status==="open" ? selected : null;
   const open = complaints.filter(c=>c.status==="open");
+  /* Optional-chaining + default so a null / partial payload never throws. */
+  const underPressure = (graphStats?.officialsUnderPressure ?? []).slice(0, 4);
 
   return (
     <div style={{ display:"grid", gridTemplateColumns:"minmax(0,1.55fr) minmax(0,1fr)", gap:18 }}>
       <div style={{ background:T.panel, border:`1px solid ${T.line}`, borderRadius:12, padding:14 }}>
+        {/* Neo4j graph mirror — an optional enrichment. Live when connected;
+            gracefully shows "unavailable" on 503 (Aura paused) without blanking. */}
+        <div style={{ display:"flex", alignItems:"center", gap:8, padding:"2px 4px 8px", fontSize:10, color:T.faint }}>
+          <span style={{ width:7, height:7, borderRadius:9, background:graphAvailable?T.teal:T.faint }}/>
+          {graphAvailable
+            ? <span>Neo4j graph mirror <span style={{ color:T.teal }}>live</span>
+                {underPressure.length>0 && <> · pressure on {underPressure.map(o=>o?.official).filter(Boolean).join(", ")}</>}
+              </span>
+            : <span>Neo4j graph mirror unavailable — showing the local pressure view</span>}
+        </div>
         <div style={{ fontSize:11, color:T.dim, padding:"2px 4px 10px" }}>
           escalation climbs <span style={{ color:T.gold }}>outward</span> — each step makes ignoring the citizen cost more
         </div>
