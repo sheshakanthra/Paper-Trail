@@ -3,7 +3,7 @@ import {
   Mic, Send, Network, ShieldAlert, Play, Pause, FastForward, CheckCircle2,
   Languages, Zap, Radio, Activity, Eye, Scale, Vote, FileText, Copy, Sparkles
 } from "lucide-react";
-import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell, Tooltip } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell, Tooltip, LabelList } from "recharts";
 
 /* ──────────────────────────────────────────────────────────────────────────
    NyayaLoop — voice-first civic grievance + OUTWARD accountability pressure.
@@ -17,7 +17,7 @@ import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell, Tooltip } from 
 
 const T = {
   bg:"#0a0a0b", panel:"#121214", panel2:"#16161a", line:"#26262c",
-  text:"#ededf2", dim:"#8a8a94", faint:"#5a5a62",
+  text:"#ededf2", dim:"#8a8a94", faint:"#72727c",
   gold:"#e0a82e", goldHi:"#f5c451", violet:"#7c5cff", teal:"#3ecf8e",
   red:"#ff5470", orange:"#ff9457", blue:"#3b9eff",
 };
@@ -460,17 +460,35 @@ export default function NyayaLoop() {
         @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap');
         *{box-sizing:border-box}
         ::selection{background:${T.gold};color:#000}
-        .nl-btn{transition:transform .12s,background .15s,border-color .15s}
-        .nl-btn:active{transform:translateY(1px)}
-        .nl-chip:hover{border-color:${T.gold};color:${T.text}}
+
+        /* micro-interactions — transform / colour only, ~150–180ms, clear press feedback */
+        .nl-btn{transition:transform .15s ease,background .18s ease,border-color .18s ease,filter .18s ease,box-shadow .18s ease}
+        .nl-btn:hover:not(:disabled){filter:brightness(1.12)}
+        .nl-btn:active:not(:disabled){transform:translateY(1px)}
+        .nl-chip{transition:border-color .18s ease,color .18s ease,background .18s ease}
+        .nl-chip:hover{border-color:${T.gold};color:${T.text};background:${T.panel2}}
+        .nl-tab{transition:color .18s ease,border-color .18s ease}
+        .nl-tab:hover{color:${T.text}}
+
+        /* selectable complaint cards — a lift that never shifts neighbouring content */
+        .nl-card{transition:transform .15s ease,box-shadow .18s ease,border-color .18s ease}
+        .nl-card:hover{transform:translateY(-1px);box-shadow:0 6px 16px -8px rgba(0,0,0,.55)}
+
         @keyframes pulse{0%,100%{opacity:.4}50%{opacity:1}}
         @keyframes dash{to{stroke-dashoffset:-16}}
         @keyframes rec{0%,100%{opacity:1}50%{opacity:.25}}
         .flow{stroke-dasharray:5 5;animation:dash 1s linear infinite}
         .escpulse{animation:pulse 1.1s ease-in-out infinite}
-        @media (prefers-reduced-motion:reduce){.flow,.escpulse{animation:none}}
+
+        /* responsive — stack the two-column panels below tablet width */
+        .nl-split{display:grid;gap:18px;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr)}
+        .nl-split.wide{grid-template-columns:minmax(0,1.55fr) minmax(0,1fr)}
+        @media (max-width:760px){.nl-split,.nl-split.wide{grid-template-columns:1fr}}
+
+        /* accessibility — visible keyboard focus on every interactive surface; honour reduced-motion */
         textarea,select{font-family:inherit}
-        textarea:focus,select:focus,button:focus-visible{outline:2px solid ${T.gold};outline-offset:2px}
+        textarea:focus,select:focus,button:focus-visible,[role="button"]:focus-visible{outline:2px solid ${T.gold};outline-offset:2px;border-radius:8px}
+        @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
       `}</style>
 
       {/* top bar */}
@@ -486,27 +504,27 @@ export default function NyayaLoop() {
         </div>
         <div style={{ display:"flex", gap:4, marginLeft:8 }}>
           {[["file","File"],["graph","Pressure chain"],["pattern","Pattern, not incident"]].map(([k,l]) => (
-            <button key={k} onClick={()=>setTab(k)} className="nl-btn"
+            <button key={k} onClick={()=>setTab(k)} className="nl-btn nl-tab" aria-current={tab===k?"page":undefined}
               style={{ background:"none", border:"none", cursor:"pointer", padding:"6px 10px", fontSize:12,
                 color:tab===k?T.text:T.dim, borderBottom:`2px solid ${tab===k?T.gold:"transparent"}` }}>{l}</button>
           ))}
         </div>
         <div style={{ marginLeft:"auto", display:"flex", alignItems:"center", gap:10 }}>
           <span style={{ fontSize:11, color:T.dim }}>Day {day}</span>
-          <button className="nl-btn" onClick={()=>setPlaying(p=>!p)}
+          <button className="nl-btn" onClick={()=>setPlaying(p=>!p)} aria-pressed={playing}
             style={{ display:"flex", alignItems:"center", gap:6, background:playing?T.violet:T.panel2, color:playing?"#fff":T.text,
               border:`1px solid ${T.line}`, borderRadius:7, padding:"6px 11px", cursor:"pointer", fontSize:11 }}>
             {playing?<Pause size={13}/>:<Play size={13}/>}{playing?"Running":"Run engine"}
           </button>
-          <button className="nl-btn" onClick={()=>setDay(d=>d+1)}
-            style={{ display:"grid", placeItems:"center", background:T.panel2, color:T.text, border:`1px solid ${T.line}`, borderRadius:7, padding:"7px 8px", cursor:"pointer" }}>
+          <button className="nl-btn" onClick={()=>setDay(d=>d+1)} aria-label="Advance one day" title="Advance one day"
+            style={{ display:"grid", placeItems:"center", background:T.panel2, color:T.text, border:`1px solid ${T.line}`, borderRadius:7, padding:"8px 10px", cursor:"pointer" }}>
             <FastForward size={13}/>
           </button>
         </div>
       </div>
 
       {/* status strip */}
-      <div style={{ display:"flex", gap:22, padding:"9px 20px", borderBottom:`1px solid ${T.line}`, fontSize:11, color:T.dim, background:T.panel }}>
+      <div style={{ display:"flex", flexWrap:"wrap", gap:"6px 22px", padding:"9px 20px", borderBottom:`1px solid ${T.line}`, fontSize:11, color:T.dim, background:T.panel }}>
         <span><b style={{ color:T.text }}>{openC.length}</b> open</span>
         <span><b style={{ color:T.orange }}>{flags}</b> publicly flagged</span>
         <span><b style={{ color:T.red }}>{rtis}</b> RTIs auto-filed</span>
@@ -532,7 +550,7 @@ export default function NyayaLoop() {
 /* ───── FILE ───── */
 function FilePanel({ lang,setLang,draft,setDraft,listening,transcribing,sarvamEnabled,startVoice,stopVoice,busy,fileComplaint,routeResult }) {
   return (
-    <div style={{ display:"grid", gridTemplateColumns:"minmax(0,1.4fr) minmax(0,1fr)", gap:18 }}>
+    <div className="nl-split">
       <div style={{ background:T.panel, border:`1px solid ${T.line}`, borderRadius:12, padding:18 }}>
         <div style={{ fontSize:12, color:T.dim, marginBottom:12, display:"flex", alignItems:"center", gap:8 }}>
           <Radio size={14} color={T.gold}/> File a grievance — speak or type, in any language
@@ -566,6 +584,7 @@ function FilePanel({ lang,setLang,draft,setDraft,listening,transcribing,sarvamEn
             style={{ display:"flex", alignItems:"center", gap:8, marginLeft:"auto",
               background:busy||!draft.trim()?T.panel2:`linear-gradient(135deg,${T.gold},${T.goldHi})`,
               color:busy||!draft.trim()?T.faint:"#000", fontWeight:600, border:"none", borderRadius:9, padding:"10px 18px",
+              boxShadow:busy||!draft.trim()?"none":"0 4px 16px -8px rgba(224,168,46,.6)",
               cursor:busy||!draft.trim()?"default":"pointer", fontSize:12 }}>
             {busy?<Activity size={15} className="escpulse"/>:<Send size={15}/>}{busy?"Routing…":"File complaint"}
           </button>
@@ -622,7 +641,7 @@ function GraphPanel({ stats, complaints, selected, setSelectedId, resolve, day, 
   const underPressure = (graphStats?.officialsUnderPressure ?? []).slice(0, 4);
 
   return (
-    <div style={{ display:"grid", gridTemplateColumns:"minmax(0,1.55fr) minmax(0,1fr)", gap:18 }}>
+    <div className="nl-split wide">
       <div style={{ background:T.panel, border:`1px solid ${T.line}`, borderRadius:12, padding:14 }}>
         {/* Neo4j graph mirror — an optional enrichment. Live when connected;
             gracefully shows "unavailable" on 503 (Aura paused) without blanking. */}
@@ -689,7 +708,10 @@ function GraphPanel({ stats, complaints, selected, setSelectedId, resolve, day, 
         {open.sort((a,b)=>b.escLevel-a.escLevel).map(c=>{
           const isSel = selected && selected.id===c.id, stage=STAGES[c.escLevel];
           return (
-            <div key={c.id} onClick={()=>setSelectedId(c.id)}
+            <div key={c.id} className="nl-card" role="button" tabIndex={0} aria-pressed={isSel}
+              aria-label={`${c.summary} — ${DEPTS[c.deptId].name}, ${WARDS[c.ward].name}, ${c.urgency} urgency`}
+              onClick={()=>setSelectedId(c.id)}
+              onKeyDown={e=>{ if(e.target===e.currentTarget && (e.key==="Enter"||e.key===" ")){ e.preventDefault(); setSelectedId(c.id); } }}
               style={{ border:`1px solid ${isSel?DEPTS[c.deptId].hue:T.line}`, background:isSel?T.panel2:T.bg, borderRadius:10, padding:11, marginBottom:9, cursor:"pointer" }}>
               <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:6 }}>
                 <span style={{ width:7, height:7, borderRadius:9, background:DEPTS[c.deptId].hue }}/>
@@ -697,12 +719,12 @@ function GraphPanel({ stats, complaints, selected, setSelectedId, resolve, day, 
                 <span style={{ fontSize:9.5, color:T.faint }}>· {WARDS[c.ward].name}</span>
                 <span style={{ marginLeft:"auto", fontSize:9.5, color:URG_COLOR[c.urgency], textTransform:"uppercase" }}>{c.urgency}</span>
               </div>
-              <div style={{ fontSize:12, lineHeight:1.4, marginBottom:8 }}>{c.summary}</div>
+              <div style={{ fontSize:12, lineHeight:1.5, marginBottom:8 }}>{c.summary}</div>
               <div style={{ display:"flex", alignItems:"center", gap:8 }}>
                 <span style={{ fontSize:9.5, color:stage.color, display:"flex", alignItems:"center", gap:4 }}><stage.Icon size={11}/> {stage.label}</span>
                 <span style={{ fontSize:9.5, color:T.faint }}>· {day-c.filedDay}d</span>
-                <button className="nl-btn" onClick={e=>{ e.stopPropagation(); resolve(c.id); }}
-                  style={{ marginLeft:"auto", background:T.panel2, color:T.teal, border:`1px solid ${T.line}`, borderRadius:7, padding:"4px 9px", cursor:"pointer", fontSize:10 }}>resolve</button>
+                <button className="nl-btn" onClick={e=>{ e.stopPropagation(); resolve(c.id); }} aria-label={`Mark ${c.id} resolved`}
+                  style={{ marginLeft:"auto", background:T.panel2, color:T.teal, border:`1px solid ${T.line}`, borderRadius:7, padding:"5px 11px", cursor:"pointer", fontSize:10 }}>resolve</button>
               </div>
             </div>
           );
@@ -747,13 +769,17 @@ function Pattern({ wardStats, best, worst }) {
       )}
       <div style={{ background:T.panel, border:`1px solid ${T.line}`, borderRadius:12, padding:18, marginBottom:16 }}>
         <div style={{ fontSize:12, color:T.dim, marginBottom:14 }}>resolution rate by ward — accountability, aggregated</div>
-        <div style={{ height:220 }}>
+        <div style={{ height:220 }} role="img"
+          aria-label={`Resolution rate by ward — ${data.map(d=>`${d.name} ${d.rate} percent`).join(", ")}`}>
           <ResponsiveContainer>
-            <BarChart data={data} margin={{ top:6, right:8, left:-18, bottom:0 }}>
+            <BarChart data={data} margin={{ top:18, right:8, left:-18, bottom:0 }}>
               <XAxis dataKey="name" tick={{ fill:T.dim, fontSize:11, fontFamily:"monospace" }} axisLine={{ stroke:T.line }} tickLine={false}/>
               <YAxis domain={[0,100]} tick={{ fill:T.faint, fontSize:10, fontFamily:"monospace" }} axisLine={false} tickLine={false}/>
               <Tooltip cursor={{ fill:"#ffffff08" }} contentStyle={{ background:T.panel2, border:`1px solid ${T.line}`, borderRadius:8, fontFamily:"monospace", fontSize:12 }} formatter={(v)=>[`${v}%`,"resolved"]}/>
-              <Bar dataKey="rate" radius={[6,6,0,0]}>{data.map((d,i)=><Cell key={i} fill={d.hue}/>)}</Bar>
+              <Bar dataKey="rate" radius={[6,6,0,0]}>
+                <LabelList dataKey="rate" position="top" formatter={(v)=>`${v}%`} fill={T.dim} fontSize={10} fontFamily="monospace"/>
+                {data.map((d,i)=><Cell key={i} fill={d.hue}/>)}
+              </Bar>
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -779,10 +805,17 @@ function Pattern({ wardStats, best, worst }) {
 
 /* ───── RTI DRAWER ───── */
 function RTIDrawer({ complaint, rtiText, rtiBusy, enhanceRTI, close }) {
+  /* Escape closes the drawer — a standard modal escape route (a11y). */
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === "Escape") close(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [close]);
   if (!complaint) return null;
   return (
-    <div onClick={close} style={{ position:"fixed", inset:0, background:"#000a", display:"flex", justifyContent:"flex-end", zIndex:50 }}>
-      <div onClick={e=>e.stopPropagation()} style={{ width:"min(520px,94vw)", height:"100%", background:T.panel, borderLeft:`1px solid ${T.line}`, padding:20, overflow:"auto" }}>
+    <div onClick={close} style={{ position:"fixed", inset:0, background:"#000c", display:"flex", justifyContent:"flex-end", zIndex:50 }}>
+      <div onClick={e=>e.stopPropagation()} role="dialog" aria-modal="true" aria-label={`RTI application for ${complaint.id}`}
+        style={{ width:"min(520px,94vw)", height:"100%", background:T.panel, borderLeft:`1px solid ${T.line}`, padding:20, overflow:"auto" }}>
         <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:6 }}>
           <Scale size={18} color={T.red}/>
           <div style={{ fontSize:14, fontWeight:600 }}>RTI application · {complaint.id}</div>
