@@ -3,7 +3,7 @@ import {
   Mic, Send, Network, ShieldAlert, Play, Pause, FastForward, CheckCircle2,
   Languages, Zap, Radio, Activity, Eye, Scale, Vote, FileText, Copy, Sparkles
 } from "lucide-react";
-import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell, Tooltip } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell, Tooltip, LabelList } from "recharts";
 
 /* ──────────────────────────────────────────────────────────────────────────
    NyayaLoop — voice-first civic grievance + OUTWARD accountability pressure.
@@ -16,10 +16,17 @@ import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell, Tooltip } from 
    ────────────────────────────────────────────────────────────────────────── */
 
 const T = {
-  bg:"#0a0a0b", panel:"#121214", panel2:"#16161a", line:"#26262c",
-  text:"#ededf2", dim:"#8a8a94", faint:"#5a5a62",
-  gold:"#e0a82e", goldHi:"#f5c451", violet:"#7c5cff", teal:"#3ecf8e",
-  red:"#ff5470", orange:"#ff9457", blue:"#3b9eff",
+  bg:"#080711", panel:"#14131f", panel2:"#1a1928", line:"#2c2b3d",
+  text:"#f2f1f8", dim:"#9c9ab4", faint:"#6f6d88",
+  gold:"#f0b429", goldHi:"#ffd45e", violet:"#8b6dff", teal:"#2fd6a6",
+  red:"#ff4d6d", orange:"#ff8a3d", blue:"#4d9fff", magenta:"#e15bd8",
+};
+/* the pressure gradient — the app's one signature: escalation as rising heat */
+const GRAD = {
+  pressure:`linear-gradient(90deg,${T.teal},${T.gold},${T.orange},${T.red},${T.violet})`,
+  panel:"linear-gradient(158deg,#1b1a2b 0%,#121120 55%,#0d0c18 100%)",
+  gold:`linear-gradient(135deg,${T.gold},${T.goldHi})`,
+  brand:`linear-gradient(135deg,${T.gold} 0%,${T.orange} 40%,${T.violet} 100%)`,
 };
 
 const DEPTS = {
@@ -207,7 +214,7 @@ class GraphErrorBoundary extends React.Component {
   render() {
     if (this.state.failed) {
       return (
-        <div style={{ background:T.panel, border:`1px solid ${T.line}`, borderRadius:12, padding:18, fontSize:12, color:T.dim }}>
+        <div style={{ background:GRAD.panel, boxShadow:"0 24px 60px -34px rgba(0,0,0,.9), 0 1px 0 0 rgba(255,255,255,.045) inset", border:`1px solid ${T.line}`, borderRadius:14, padding:18, fontSize:12, color:T.dim }}>
           The pressure-chain view hit an error and was contained. The rest of NyayaLoop is unaffected — reselect a complaint or switch tabs.
         </div>
       );
@@ -455,63 +462,118 @@ export default function NyayaLoop() {
   const selected = complaints.find(c=>c.id===selectedId) || null;
 
   return (
-    <div style={{ background:T.bg, color:T.text, minHeight:660, fontFamily:"'JetBrains Mono', ui-monospace, monospace" }}>
+    <div style={{ background:`radial-gradient(1200px 600px at 15% -10%, #1a1636 0%, transparent 55%), radial-gradient(1000px 560px at 92% 0%, #14243a 0%, transparent 50%), radial-gradient(1100px 520px at 50% 120%, #1a0e22 0%, transparent 60%), ${T.bg}`, color:T.text, minHeight:660, fontFamily:"'Inter', ui-sans-serif, system-ui, sans-serif" }}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
         *{box-sizing:border-box}
         ::selection{background:${T.gold};color:#000}
-        .nl-btn{transition:transform .12s,background .15s,border-color .15s}
-        .nl-btn:active{transform:translateY(1px)}
-        .nl-chip:hover{border-color:${T.gold};color:${T.text}}
+        .nl-display{font-family:'Space Grotesk','Inter',sans-serif}
+        .nl-mono{font-family:'JetBrains Mono',ui-monospace,monospace}
+
+        /* scrollbars in-theme */
+        *::-webkit-scrollbar{width:10px;height:10px}
+        *::-webkit-scrollbar-thumb{background:${T.line};border-radius:9px;border:2px solid transparent;background-clip:content-box}
+        *::-webkit-scrollbar-thumb:hover{background:${T.faint};background-clip:content-box}
+
+        /* glass panel — subtle top highlight + colored ambient depth */
+        .nl-panel{position:relative;background:${GRAD.panel};border:1px solid ${T.line};border-radius:14px;
+          box-shadow:0 24px 60px -34px rgba(0,0,0,.9),0 1px 0 0 rgba(255,255,255,.04) inset}
+        .nl-panel::before{content:"";position:absolute;inset:0;border-radius:14px;padding:1px;pointer-events:none;
+          background:linear-gradient(160deg,rgba(255,255,255,.10),rgba(255,255,255,0) 40%);
+          -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude}
+
+        /* micro-interactions — transform / colour only, ~150–180ms, clear press feedback */
+        .nl-btn{transition:transform .15s ease,background .18s ease,border-color .18s ease,filter .18s ease,box-shadow .18s ease}
+        .nl-btn:hover:not(:disabled){filter:brightness(1.12)}
+        .nl-btn:active:not(:disabled){transform:translateY(1px)}
+        .nl-chip{transition:border-color .18s ease,color .18s ease,background .18s ease}
+        .nl-chip:hover{border-color:${T.gold};color:${T.text};background:${T.panel2}}
+        .nl-tab{transition:color .18s ease,border-color .18s ease}
+        .nl-tab:hover{color:${T.text}}
+
+        /* selectable complaint cards — a lift that never shifts neighbouring content */
+        .nl-card{transition:transform .15s ease,box-shadow .18s ease,border-color .18s ease}
+        .nl-card:hover{transform:translateY(-1px);box-shadow:0 6px 16px -8px rgba(0,0,0,.55)}
+
         @keyframes pulse{0%,100%{opacity:.4}50%{opacity:1}}
         @keyframes dash{to{stroke-dashoffset:-16}}
         @keyframes rec{0%,100%{opacity:1}50%{opacity:.25}}
         .flow{stroke-dasharray:5 5;animation:dash 1s linear infinite}
         .escpulse{animation:pulse 1.1s ease-in-out infinite}
-        @media (prefers-reduced-motion:reduce){.flow,.escpulse{animation:none}}
+
+        /* responsive — stack the two-column panels below tablet width */
+        .nl-split{display:grid;gap:18px;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr)}
+        .nl-split.wide{grid-template-columns:minmax(0,1.55fr) minmax(0,1fr)}
+        @media (max-width:760px){.nl-split,.nl-split.wide{grid-template-columns:1fr}}
+
+        /* accessibility — visible keyboard focus on every interactive surface; honour reduced-motion */
         textarea,select{font-family:inherit}
-        textarea:focus,select:focus,button:focus-visible{outline:2px solid ${T.gold};outline-offset:2px}
+        textarea:focus,select:focus,button:focus-visible,[role="button"]:focus-visible{outline:2px solid ${T.gold};outline-offset:2px;border-radius:8px}
+        @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+        /* signature — the pressure gradient, animated */
+        @keyframes flow-grad{0%{background-position:0% 50%}100%{background-position:200% 50%}}
+        .nl-accent{height:3px;background:${GRAD.pressure};background-size:200% 100%;animation:flow-grad 8s linear infinite;opacity:.9}
+        .nl-gradtext{background:${GRAD.brand};-webkit-background-clip:text;background-clip:text;color:transparent}
+
+        .nl-stat{display:inline-flex;align-items:center;gap:9px;padding:8px 14px;background:linear-gradient(180deg,${T.panel2},${T.panel});border:1px solid ${T.line};border-radius:999px;transition:border-color .18s ease,transform .15s ease,box-shadow .18s ease}
+        .nl-stat:hover{border-color:${T.dim};transform:translateY(-1px);box-shadow:0 8px 22px -14px rgba(0,0,0,.9)}
+        .nl-stat b{font-size:16px;font-weight:700;line-height:1;font-family:'JetBrains Mono',monospace}
+        .nl-dot{width:9px;height:9px;border-radius:9px;flex:none}
       `}</style>
 
       {/* top bar */}
-      <div style={{ borderBottom:`1px solid ${T.line}`, padding:"14px 20px", display:"flex", alignItems:"center", gap:18, flexWrap:"wrap" }}>
-        <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-          <div style={{ width:26, height:26, borderRadius:6, background:`linear-gradient(135deg,${T.gold},${T.violet})`, display:"grid", placeItems:"center" }}>
-            <Network size={15} color="#000" />
+      <div style={{ background:"linear-gradient(180deg,rgba(24,22,42,.85),rgba(12,11,22,.6))", backdropFilter:"blur(10px)", borderBottom:`1px solid ${T.line}`, padding:"16px 22px", display:"flex", alignItems:"center", gap:18, flexWrap:"wrap" }}>
+        <div style={{ display:"flex", alignItems:"center", gap:13 }}>
+          <div style={{ width:38, height:38, borderRadius:11, background:GRAD.brand, display:"grid", placeItems:"center", boxShadow:`0 0 26px -4px ${T.violet}, 0 6px 18px -8px ${T.gold}` }}>
+            <Network size={21} color="#0b0a14" strokeWidth={2.4} />
           </div>
           <div>
-            <div style={{ fontWeight:700, letterSpacing:2, fontSize:15 }}>NYAYA<span style={{ color:T.gold }}>LOOP</span></div>
-            <div style={{ fontSize:9.5, color:T.faint, letterSpacing:1 }}>inaction has a price</div>
+            <div className="nl-display" style={{ fontWeight:700, letterSpacing:1.5, fontSize:20, lineHeight:1 }}>NYAYA<span className="nl-gradtext">LOOP</span></div>
+            <div style={{ fontSize:10, color:T.faint, letterSpacing:1.5, marginTop:3, textTransform:"uppercase" }}>inaction has a price</div>
           </div>
         </div>
-        <div style={{ display:"flex", gap:4, marginLeft:8 }}>
+        <div style={{ display:"flex", gap:4, marginLeft:10 }}>
           {[["file","File"],["graph","Pressure chain"],["pattern","Pattern, not incident"]].map(([k,l]) => (
-            <button key={k} onClick={()=>setTab(k)} className="nl-btn"
-              style={{ background:"none", border:"none", cursor:"pointer", padding:"6px 10px", fontSize:12,
-                color:tab===k?T.text:T.dim, borderBottom:`2px solid ${tab===k?T.gold:"transparent"}` }}>{l}</button>
+            <button key={k} onClick={()=>setTab(k)} className="nl-btn nl-tab nl-display" aria-current={tab===k?"page":undefined}
+              style={{ background:tab===k?T.panel2:"none", border:`1px solid ${tab===k?T.line:"transparent"}`, cursor:"pointer", padding:"7px 13px", fontSize:12.5, fontWeight:600, borderRadius:9,
+                color:tab===k?T.text:T.dim, boxShadow:tab===k?`0 2px 12px -8px ${T.violet}`:"none" }}>{l}</button>
           ))}
         </div>
         <div style={{ marginLeft:"auto", display:"flex", alignItems:"center", gap:10 }}>
-          <span style={{ fontSize:11, color:T.dim }}>Day {day}</span>
-          <button className="nl-btn" onClick={()=>setPlaying(p=>!p)}
+          <span className="nl-mono" style={{ fontSize:11, color:T.dim }}>Day <b style={{ color:T.text, fontWeight:600 }}>{day}</b></span>
+          <button className="nl-btn" onClick={()=>setPlaying(p=>!p)} aria-pressed={playing}
             style={{ display:"flex", alignItems:"center", gap:6, background:playing?T.violet:T.panel2, color:playing?"#fff":T.text,
               border:`1px solid ${T.line}`, borderRadius:7, padding:"6px 11px", cursor:"pointer", fontSize:11 }}>
             {playing?<Pause size={13}/>:<Play size={13}/>}{playing?"Running":"Run engine"}
           </button>
-          <button className="nl-btn" onClick={()=>setDay(d=>d+1)}
-            style={{ display:"grid", placeItems:"center", background:T.panel2, color:T.text, border:`1px solid ${T.line}`, borderRadius:7, padding:"7px 8px", cursor:"pointer" }}>
+          <button className="nl-btn" onClick={()=>setDay(d=>d+1)} aria-label="Advance one day" title="Advance one day"
+            style={{ display:"grid", placeItems:"center", background:T.panel2, color:T.text, border:`1px solid ${T.line}`, borderRadius:7, padding:"8px 10px", cursor:"pointer" }}>
             <FastForward size={13}/>
           </button>
         </div>
       </div>
 
-      {/* status strip */}
-      <div style={{ display:"flex", gap:22, padding:"9px 20px", borderBottom:`1px solid ${T.line}`, fontSize:11, color:T.dim, background:T.panel }}>
-        <span><b style={{ color:T.text }}>{openC.length}</b> open</span>
-        <span><b style={{ color:T.orange }}>{flags}</b> publicly flagged</span>
-        <span><b style={{ color:T.red }}>{rtis}</b> RTIs auto-filed</span>
-        <span><b style={{ color:T.teal }}>{complaints.filter(c=>c.status==="resolved").length}</b> resolved</span>
-        <span style={{ marginLeft:"auto", color:T.faint }}>AI routing · Sarvam · Neo4j · Render</span>
+      <div className="nl-accent"/>
+
+      {/* status strip — stat pills */}
+      <div style={{ display:"flex", flexWrap:"wrap", alignItems:"center", gap:10, padding:"13px 20px", borderBottom:`1px solid ${T.line}`, background:"linear-gradient(180deg,rgba(20,19,31,.6),rgba(8,7,17,.2))" }}>
+        {[
+          [openC.length, "open", T.gold],
+          [flags, "publicly flagged", T.orange],
+          [rtis, "RTIs auto-filed", T.red],
+          [complaints.filter(c=>c.status==="resolved").length, "resolved", T.teal],
+        ].map(([n,label,color]) => (
+          <span key={label} className="nl-stat">
+            <span className="nl-dot" style={{ background:color, boxShadow:`0 0 10px -1px ${color}` }}/>
+            <b style={{ color:T.text }}>{n}</b>
+            <span style={{ fontSize:11, color:T.dim }}>{label}</span>
+          </span>
+        ))}
+        <span className="nl-mono" style={{ marginLeft:"auto", fontSize:10, color:T.faint, letterSpacing:.5, display:"flex", gap:7, alignItems:"center" }}>
+          <span style={{ width:6, height:6, borderRadius:9, background:T.teal, boxShadow:`0 0 8px ${T.teal}` }}/>
+          AI routing · Sarvam · Neo4j · Render
+        </span>
       </div>
 
       <div style={{ padding:20 }}>
@@ -532,10 +594,10 @@ export default function NyayaLoop() {
 /* ───── FILE ───── */
 function FilePanel({ lang,setLang,draft,setDraft,listening,transcribing,sarvamEnabled,startVoice,stopVoice,busy,fileComplaint,routeResult }) {
   return (
-    <div style={{ display:"grid", gridTemplateColumns:"minmax(0,1.4fr) minmax(0,1fr)", gap:18 }}>
-      <div style={{ background:T.panel, border:`1px solid ${T.line}`, borderRadius:12, padding:18 }}>
-        <div style={{ fontSize:12, color:T.dim, marginBottom:12, display:"flex", alignItems:"center", gap:8 }}>
-          <Radio size={14} color={T.gold}/> File a grievance — speak or type, in any language
+    <div className="nl-split">
+      <div style={{ background:GRAD.panel, boxShadow:"0 24px 60px -34px rgba(0,0,0,.9), 0 1px 0 0 rgba(255,255,255,.045) inset", border:`1px solid ${T.line}`, borderRadius:14, padding:18 }}>
+        <div className="nl-display" style={{ fontSize:13.5, fontWeight:600, color:T.text, marginBottom:14, display:"flex", alignItems:"center", gap:9 }}>
+          <Radio size={15} color={T.gold}/> File a grievance <span style={{ color:T.dim, fontWeight:400, fontSize:12 }}>— speak or type, in any language</span>
         </div>
         <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:12 }}>
           <Languages size={15} color={T.dim}/>
@@ -562,11 +624,12 @@ function FilePanel({ lang,setLang,draft,setDraft,listening,transcribing,sarvamEn
             {transcribing ? <Activity size={15} className="escpulse"/> : <Mic size={15}/>}
             {transcribing ? "Transcribing…" : (listening ? "Stop" : "Speak")}
           </button>
-          <button className="nl-btn" onClick={()=>fileComplaint()} disabled={busy||!draft.trim()}
+          <button className="nl-btn nl-display" onClick={()=>fileComplaint()} disabled={busy||!draft.trim()}
             style={{ display:"flex", alignItems:"center", gap:8, marginLeft:"auto",
-              background:busy||!draft.trim()?T.panel2:`linear-gradient(135deg,${T.gold},${T.goldHi})`,
-              color:busy||!draft.trim()?T.faint:"#000", fontWeight:600, border:"none", borderRadius:9, padding:"10px 18px",
-              cursor:busy||!draft.trim()?"default":"pointer", fontSize:12 }}>
+              background:busy||!draft.trim()?T.panel2:GRAD.gold,
+              color:busy||!draft.trim()?T.faint:"#1a1305", fontWeight:700, border:"none", borderRadius:10, padding:"11px 20px",
+              boxShadow:busy||!draft.trim()?"none":`0 8px 24px -8px ${T.gold}, 0 2px 0 0 rgba(255,255,255,.25) inset`,
+              cursor:busy||!draft.trim()?"default":"pointer", fontSize:12.5 }}>
             {busy?<Activity size={15} className="escpulse"/>:<Send size={15}/>}{busy?"Routing…":"File complaint"}
           </button>
         </div>
@@ -580,9 +643,9 @@ function FilePanel({ lang,setLang,draft,setDraft,listening,transcribing,sarvamEn
           </div>
         </div>
       </div>
-      <div style={{ background:T.panel, border:`1px solid ${T.line}`, borderRadius:12, padding:18 }}>
-        <div style={{ fontSize:12, color:T.dim, marginBottom:14, display:"flex", alignItems:"center", gap:8 }}>
-          <Zap size={14} color={T.gold}/> Routing decision
+      <div style={{ background:GRAD.panel, boxShadow:"0 24px 60px -34px rgba(0,0,0,.9), 0 1px 0 0 rgba(255,255,255,.045) inset", border:`1px solid ${T.line}`, borderRadius:14, padding:18 }}>
+        <div className="nl-display" style={{ fontSize:13.5, fontWeight:600, color:T.text, marginBottom:14, display:"flex", alignItems:"center", gap:9 }}>
+          <Zap size={15} color={T.gold}/> Routing decision
         </div>
         {!routeResult ? (
           <div style={{ color:T.faint, fontSize:12, lineHeight:1.7 }}>
@@ -622,8 +685,8 @@ function GraphPanel({ stats, complaints, selected, setSelectedId, resolve, day, 
   const underPressure = (graphStats?.officialsUnderPressure ?? []).slice(0, 4);
 
   return (
-    <div style={{ display:"grid", gridTemplateColumns:"minmax(0,1.55fr) minmax(0,1fr)", gap:18 }}>
-      <div style={{ background:T.panel, border:`1px solid ${T.line}`, borderRadius:12, padding:14 }}>
+    <div className="nl-split wide">
+      <div style={{ background:GRAD.panel, boxShadow:"0 24px 60px -34px rgba(0,0,0,.9), 0 1px 0 0 rgba(255,255,255,.045) inset", border:`1px solid ${T.line}`, borderRadius:14, padding:14 }}>
         {/* Neo4j graph mirror — an optional enrichment. Live when connected;
             gracefully shows "unavailable" on 503 (Aura paused) without blanking. */}
         <div style={{ display:"flex", alignItems:"center", gap:8, padding:"2px 4px 8px", fontSize:10, color:T.faint }}>
@@ -683,26 +746,29 @@ function GraphPanel({ stats, complaints, selected, setSelectedId, resolve, day, 
       </div>
 
       {/* queue */}
-      <div style={{ background:T.panel, border:`1px solid ${T.line}`, borderRadius:12, padding:14, maxHeight:430, overflow:"auto" }}>
-        <div style={{ fontSize:11, color:T.dim, marginBottom:10 }}>open complaints · {open.length}</div>
+      <div style={{ background:GRAD.panel, boxShadow:"0 24px 60px -34px rgba(0,0,0,.9), 0 1px 0 0 rgba(255,255,255,.045) inset", border:`1px solid ${T.line}`, borderRadius:14, padding:14, maxHeight:430, overflow:"auto" }}>
+        <div className="nl-display" style={{ fontSize:12.5, fontWeight:600, color:T.text, marginBottom:12, display:"flex", alignItems:"center", gap:7 }}>Open complaints <span className="nl-mono" style={{ fontSize:10.5, color:"#0b0a14", background:GRAD.gold, borderRadius:999, padding:"1px 8px", fontWeight:700 }}>{open.length}</span></div>
         {open.length===0 && <div style={{ color:T.faint, fontSize:12 }}>All clear. File one, then run the engine to watch it escalate outward.</div>}
         {open.sort((a,b)=>b.escLevel-a.escLevel).map(c=>{
           const isSel = selected && selected.id===c.id, stage=STAGES[c.escLevel];
           return (
-            <div key={c.id} onClick={()=>setSelectedId(c.id)}
-              style={{ border:`1px solid ${isSel?DEPTS[c.deptId].hue:T.line}`, background:isSel?T.panel2:T.bg, borderRadius:10, padding:11, marginBottom:9, cursor:"pointer" }}>
+            <div key={c.id} className="nl-card" role="button" tabIndex={0} aria-pressed={isSel}
+              aria-label={`${c.summary} — ${DEPTS[c.deptId].name}, ${WARDS[c.ward].name}, ${c.urgency} urgency`}
+              onClick={()=>setSelectedId(c.id)}
+              onKeyDown={e=>{ if(e.target===e.currentTarget && (e.key==="Enter"||e.key===" ")){ e.preventDefault(); setSelectedId(c.id); } }}
+              style={{ border:`1px solid ${T.line}`, background:isSel?T.panel2:T.bg, boxShadow:isSel?`inset 4px 0 0 ${DEPTS[c.deptId].hue}`:undefined, borderRadius:10, padding:11, marginBottom:9, cursor:"pointer" }}>
               <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:6 }}>
                 <span style={{ width:7, height:7, borderRadius:9, background:DEPTS[c.deptId].hue }}/>
                 <span style={{ fontSize:10, color:T.dim }}>{DEPTS[c.deptId].name}</span>
                 <span style={{ fontSize:9.5, color:T.faint }}>· {WARDS[c.ward].name}</span>
                 <span style={{ marginLeft:"auto", fontSize:9.5, color:URG_COLOR[c.urgency], textTransform:"uppercase" }}>{c.urgency}</span>
               </div>
-              <div style={{ fontSize:12, lineHeight:1.4, marginBottom:8 }}>{c.summary}</div>
+              <div style={{ fontSize:12, lineHeight:1.5, marginBottom:8 }}>{c.summary}</div>
               <div style={{ display:"flex", alignItems:"center", gap:8 }}>
                 <span style={{ fontSize:9.5, color:stage.color, display:"flex", alignItems:"center", gap:4 }}><stage.Icon size={11}/> {stage.label}</span>
                 <span style={{ fontSize:9.5, color:T.faint }}>· {day-c.filedDay}d</span>
-                <button className="nl-btn" onClick={e=>{ e.stopPropagation(); resolve(c.id); }}
-                  style={{ marginLeft:"auto", background:T.panel2, color:T.teal, border:`1px solid ${T.line}`, borderRadius:7, padding:"4px 9px", cursor:"pointer", fontSize:10 }}>resolve</button>
+                <button className="nl-btn" onClick={e=>{ e.stopPropagation(); resolve(c.id); }} aria-label={`Mark ${c.id} resolved`}
+                  style={{ marginLeft:"auto", background:T.panel2, color:T.teal, border:`1px solid ${T.line}`, borderRadius:7, padding:"5px 11px", cursor:"pointer", fontSize:10 }}>resolve</button>
               </div>
             </div>
           );
@@ -731,11 +797,13 @@ function Pattern({ wardStats, best, worst }) {
   return (
     <div>
       {worst && best && (
-        <div style={{ background:"linear-gradient(135deg,#1a0e12,#14060a)", border:`1px solid ${T.red}`, borderRadius:12, padding:18, marginBottom:16, display:"flex", alignItems:"center", gap:16 }}>
-          <ShieldAlert size={30} color={T.red}/>
+        <div style={{ background:`linear-gradient(120deg,#24101c 0%,#1c0a12 50%,#12060c 100%)`, border:`1px solid ${T.red}`, boxShadow:`0 24px 60px -30px ${T.red}, 0 0 0 1px rgba(255,77,109,.08) inset`, borderRadius:14, padding:20, marginBottom:16, display:"flex", alignItems:"center", gap:18 }}>
+          <div style={{ width:52, height:52, flex:"none", borderRadius:13, display:"grid", placeItems:"center", background:`linear-gradient(135deg,${T.red},${T.magenta})`, boxShadow:`0 0 28px -6px ${T.red}` }}>
+            <ShieldAlert size={28} color="#fff"/>
+          </div>
           <div>
-            <div style={{ fontSize:10, color:T.red, letterSpacing:1, marginBottom:4 }}>THE PATTERN</div>
-            <div style={{ fontSize:15, fontWeight:600, lineHeight:1.4 }}>
+            <div className="nl-display" style={{ fontSize:10.5, color:T.red, letterSpacing:2, marginBottom:5, fontWeight:600 }}>THE PATTERN</div>
+            <div style={{ fontSize:15.5, fontWeight:600, lineHeight:1.45 }}>
               {worst.name} sits at <span style={{ color:T.red }}>{worst.rate}%</span> resolved, {worst.open} open, avg age {worst.avgAge}d —
               while {best.name} clears at <span style={{ color:T.teal }}>{best.rate}%</span>.
             </div>
@@ -745,25 +813,29 @@ function Pattern({ wardStats, best, worst }) {
           </div>
         </div>
       )}
-      <div style={{ background:T.panel, border:`1px solid ${T.line}`, borderRadius:12, padding:18, marginBottom:16 }}>
-        <div style={{ fontSize:12, color:T.dim, marginBottom:14 }}>resolution rate by ward — accountability, aggregated</div>
-        <div style={{ height:220 }}>
+      <div style={{ background:GRAD.panel, boxShadow:"0 24px 60px -34px rgba(0,0,0,.9), 0 1px 0 0 rgba(255,255,255,.045) inset", border:`1px solid ${T.line}`, borderRadius:14, padding:18, marginBottom:16 }}>
+        <div className="nl-display" style={{ fontSize:13.5, fontWeight:600, color:T.text, marginBottom:16 }}>Resolution rate by ward <span style={{ color:T.dim, fontWeight:400, fontSize:12 }}>— accountability, aggregated</span></div>
+        <div style={{ height:220 }} role="img"
+          aria-label={`Resolution rate by ward — ${data.map(d=>`${d.name} ${d.rate} percent`).join(", ")}`}>
           <ResponsiveContainer>
-            <BarChart data={data} margin={{ top:6, right:8, left:-18, bottom:0 }}>
+            <BarChart data={data} margin={{ top:18, right:8, left:-18, bottom:0 }}>
               <XAxis dataKey="name" tick={{ fill:T.dim, fontSize:11, fontFamily:"monospace" }} axisLine={{ stroke:T.line }} tickLine={false}/>
               <YAxis domain={[0,100]} tick={{ fill:T.faint, fontSize:10, fontFamily:"monospace" }} axisLine={false} tickLine={false}/>
               <Tooltip cursor={{ fill:"#ffffff08" }} contentStyle={{ background:T.panel2, border:`1px solid ${T.line}`, borderRadius:8, fontFamily:"monospace", fontSize:12 }} formatter={(v)=>[`${v}%`,"resolved"]}/>
-              <Bar dataKey="rate" radius={[6,6,0,0]}>{data.map((d,i)=><Cell key={i} fill={d.hue}/>)}</Bar>
+              <Bar dataKey="rate" radius={[6,6,0,0]}>
+                <LabelList dataKey="rate" position="top" formatter={(v)=>`${v}%`} fill={T.dim} fontSize={10} fontFamily="monospace"/>
+                {data.map((d,i)=><Cell key={i} fill={d.hue}/>)}
+              </Bar>
             </BarChart>
           </ResponsiveContainer>
         </div>
       </div>
       <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(210px,1fr))", gap:12 }}>
         {wardStats.filter(w=>w.total).map(w=>(
-          <div key={w.id} style={{ background:T.panel, border:`1px solid ${w===worst?T.red:T.line}`, borderRadius:11, padding:14 }}>
+          <div key={w.id} style={{ background:"linear-gradient(180deg,#15151b,#101014)", boxShadow:w===worst?`0 16px 40px -26px ${T.red}`:"0 14px 36px -24px rgba(0,0,0,.95)", border:`1px solid ${w===worst?T.red:T.line}`, borderRadius:11, padding:14 }}>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:6 }}>
-              <span style={{ fontSize:13, fontWeight:600 }}>{w.name}</span>
-              <span style={{ fontSize:18, fontWeight:700, color:w.rate>=70?T.teal:w.rate>=40?T.gold:T.red }}>{w.rate}%</span>
+              <span className="nl-display" style={{ fontSize:14, fontWeight:600 }}>{w.name}</span>
+              <span className="nl-mono" style={{ fontSize:24, fontWeight:700, color:w.rate>=70?T.teal:w.rate>=40?T.gold:T.red, textShadow:`0 0 20px ${(w.rate>=70?T.teal:w.rate>=40?T.gold:T.red)}55` }}>{w.rate}%</span>
             </div>
             <div style={{ fontSize:10.5, color:T.faint, marginBottom:8 }}>{w.rep}</div>
             <div style={{ display:"flex", gap:14, fontSize:10.5, color:T.dim }}>
@@ -779,13 +851,22 @@ function Pattern({ wardStats, best, worst }) {
 
 /* ───── RTI DRAWER ───── */
 function RTIDrawer({ complaint, rtiText, rtiBusy, enhanceRTI, close }) {
+  /* Escape closes the drawer — a standard modal escape route (a11y). */
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === "Escape") close(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [close]);
   if (!complaint) return null;
   return (
-    <div onClick={close} style={{ position:"fixed", inset:0, background:"#000a", display:"flex", justifyContent:"flex-end", zIndex:50 }}>
-      <div onClick={e=>e.stopPropagation()} style={{ width:"min(520px,94vw)", height:"100%", background:T.panel, borderLeft:`1px solid ${T.line}`, padding:20, overflow:"auto" }}>
-        <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:6 }}>
-          <Scale size={18} color={T.red}/>
-          <div style={{ fontSize:14, fontWeight:600 }}>RTI application · {complaint.id}</div>
+    <div onClick={close} style={{ position:"fixed", inset:0, background:"#000c", display:"flex", justifyContent:"flex-end", zIndex:50 }}>
+      <div onClick={e=>e.stopPropagation()} role="dialog" aria-modal="true" aria-label={`RTI application for ${complaint.id}`}
+        style={{ width:"min(520px,94vw)", height:"100%", background:`linear-gradient(180deg,#181626,#0d0c17)`, borderLeft:`1px solid ${T.red}44`, boxShadow:`-30px 0 80px -30px rgba(0,0,0,.9), -1px 0 0 0 ${T.red}22`, padding:22, overflow:"auto" }}>
+        <div style={{ display:"flex", alignItems:"center", gap:11, marginBottom:6 }}>
+          <div style={{ width:34, height:34, flex:"none", borderRadius:9, display:"grid", placeItems:"center", background:`linear-gradient(135deg,${T.red},${T.magenta})`, boxShadow:`0 0 20px -6px ${T.red}` }}>
+            <Scale size={17} color="#fff"/>
+          </div>
+          <div className="nl-display" style={{ fontSize:15, fontWeight:600 }}>RTI application · <span className="nl-mono">{complaint.id}</span></div>
           <button className="nl-btn" onClick={close} style={{ marginLeft:"auto", background:"none", border:`1px solid ${T.line}`, color:T.dim, borderRadius:7, padding:"4px 10px", cursor:"pointer", fontSize:12 }}>close</button>
         </div>
         <div style={{ fontSize:11, color:T.faint, marginBottom:14 }}>
