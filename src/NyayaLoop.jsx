@@ -248,7 +248,10 @@ export default function NyayaLoop() {
   const [rtiBusy, setRtiBusy] = useState(false);
   const [graphAvailable, setGraphAvailable] = useState(false); // Neo4j mirror live?
   const [graphStats, setGraphStats] = useState(null);          // {perDepartment, officialsUnderPressure}
+  const [sarvamEnabled, setSarvamEnabled] = useState(false);   // Sarvam ASR live server-side?
+  const [transcribing, setTranscribing] = useState(false);     // Sarvam request in flight
   const recogRef = useRef(null);
+  const mediaRef = useRef(null);   // { recorder, stream } for the Sarvam record path
   const hydratedRef = useRef(false);
 
   /* Load persisted complaints; if the store is empty, seed it once and persist.
@@ -296,6 +299,18 @@ export default function NyayaLoop() {
     return () => { cancelled = true; };
   }, [complaints, tab]);
 
+  /* SARVAM seam: ask the server once whether Sarvam ASR is live. If it is, the
+     mic records audio and posts it to /api/transcribe; if not (or on any
+     failure) voice falls back to the browser recognizer. */
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/health")
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (!cancelled) setSarvamEnabled(Boolean(d && d.sarvam)); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
   useEffect(() => {
     if (!playing) return;
     const t = setInterval(() => setDay(d => d + 1), 2200);
@@ -319,17 +334,77 @@ export default function NyayaLoop() {
     }));
   }, [day]);
 
-  function startVoice() {
-    // ── SARVAM seam: replace with Sarvam streaming ASR for real Indic accuracy ──
+  /* Browser Web Speech API — the always-available fallback (real-time, on-device
+     where supported). This is exactly the pre-Sarvam behaviour. */
+  function browserVoice() {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SR) { setDraft(d => d || "Voice capture isn't available here — type the complaint instead."); return; }
+    if (!SR) { setDraft(d => d || "Voice capture isn't available here — type the complaint instead."); setListening(false); return; }
     const r = new SR();
     r.lang = lang; r.interimResults = true; r.continuous = false;
     r.onresult = e => setDraft(Array.from(e.results).map(x=>x[0].transcript).join(""));
     r.onend = () => setListening(false); r.onerror = () => setListening(false);
     recogRef.current = r; setListening(true); r.start();
   }
-  function stopVoice(){ recogRef.current && recogRef.current.stop(); setListening(false); }
+
+  /* Send a recorded audio blob to the Sarvam proxy. On ANY failure (seam off,
+     network, empty transcript) fall back to the browser recognizer so the mic
+     never dead-ends. */
+  async function sendToSarvam(blob) {
+    setTranscribing(true);
+    try {
+      const res = await fetch(`/api/transcribe?language=${encodeURIComponent(lang)}`, {
+        method: "POST",
+        headers: { "Content-Type": blob.type || "audio/webm" },
+        body: blob,
+      });
+      if (!res.ok) throw new Error("sarvam unavailable");
+      const data = await res.json();
+      const text = (data.transcript || "").trim();
+      if (!text) throw new Error("empty transcript");
+      setDraft(d => (d ? d.trim() + " " : "") + text);
+      setTranscribing(false);
+    } catch {
+      setTranscribing(false);
+      browserVoice(); // fail-safe: keep voice working via the browser recognizer
+    }
+  }
+
+  /* ── SARVAM seam: when the server reports Sarvam live, record the mic and send
+     the audio for real Indic ASR; otherwise use the browser recognizer. ── */
+  async function startVoice() {
+    const canRecord = sarvamEnabled && typeof window.MediaRecorder !== "undefined"
+      && navigator.mediaDevices && navigator.mediaDevices.getUserMedia;
+    if (!canRecord) return browserVoice();
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mime = MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm" : "";
+      const rec = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+      const chunks = [];
+      rec.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
+      rec.onstop = () => {
+        stream.getTracks().forEach(t => t.stop());
+        const blob = new Blob(chunks, { type: rec.mimeType || "audio/webm" });
+        mediaRef.current = null;
+        if (blob.size) sendToSarvam(blob); else browserVoice();
+      };
+      mediaRef.current = { recorder: rec, stream };
+      rec.start();
+      setListening(true);
+    } catch {
+      browserVoice(); // mic denied / MediaRecorder failed -> browser fallback
+    }
+  }
+
+  function stopVoice() {
+    const media = mediaRef.current;
+    if (media && media.recorder && media.recorder.state !== "inactive") {
+      media.recorder.stop();   // triggers onstop -> sendToSarvam
+      setListening(false);
+      return;
+    }
+    if (recogRef.current) recogRef.current.stop();
+    setListening(false);
+  }
 
   async function fileComplaint(text) {
     const body = (text ?? draft).trim();
@@ -440,7 +515,7 @@ export default function NyayaLoop() {
       </div>
 
       <div style={{ padding:20 }}>
-        {tab==="file" && <FilePanel {...{lang,setLang,draft,setDraft,listening,startVoice,stopVoice,busy,fileComplaint,routeResult}} />}
+        {tab==="file" && <FilePanel {...{lang,setLang,draft,setDraft,listening,transcribing,sarvamEnabled,startVoice,stopVoice,busy,fileComplaint,routeResult}} />}
         {tab==="graph" && (
           <GraphErrorBoundary>
             <GraphPanel {...{stats,complaints,selected,setSelectedId,resolve,day,openRTI,graphAvailable,graphStats}} />
@@ -455,7 +530,7 @@ export default function NyayaLoop() {
 }
 
 /* ───── FILE ───── */
-function FilePanel({ lang,setLang,draft,setDraft,listening,startVoice,stopVoice,busy,fileComplaint,routeResult }) {
+function FilePanel({ lang,setLang,draft,setDraft,listening,transcribing,sarvamEnabled,startVoice,stopVoice,busy,fileComplaint,routeResult }) {
   return (
     <div style={{ display:"grid", gridTemplateColumns:"minmax(0,1.4fr) minmax(0,1fr)", gap:18 }}>
       <div style={{ background:T.panel, border:`1px solid ${T.line}`, borderRadius:12, padding:18 }}>
@@ -468,7 +543,9 @@ function FilePanel({ lang,setLang,draft,setDraft,listening,startVoice,stopVoice,
             style={{ background:T.panel2, color:T.text, border:`1px solid ${T.line}`, borderRadius:8, padding:"7px 10px", fontSize:12 }}>
             {LANGS.map(l=><option key={l.code} value={l.code}>{l.label}</option>)}
           </select>
-          <span style={{ fontSize:10, color:T.faint }}>Indic ASR via Sarvam in production</span>
+          <span style={{ fontSize:10, color:sarvamEnabled?T.teal:T.faint }}>
+            {sarvamEnabled ? "Indic ASR via Sarvam — live" : "Indic ASR via Sarvam (browser fallback)"}
+          </span>
         </div>
         <div style={{ position:"relative" }}>
           <textarea value={draft} onChange={e=>setDraft(e.target.value)} rows={4}
@@ -478,9 +555,12 @@ function FilePanel({ lang,setLang,draft,setDraft,listening,startVoice,stopVoice,
             <span style={{ width:7, height:7, borderRadius:9, background:T.red, animation:"rec 1s infinite" }}/> listening</span>}
         </div>
         <div style={{ display:"flex", gap:10, marginTop:12 }}>
-          <button className="nl-btn" onClick={listening?stopVoice:startVoice}
-            style={{ display:"flex", alignItems:"center", gap:8, background:listening?T.red:T.panel2, color:listening?"#fff":T.text, border:`1px solid ${T.line}`, borderRadius:9, padding:"10px 14px", cursor:"pointer", fontSize:12 }}>
-            <Mic size={15}/> {listening?"Stop":"Speak"}
+          <button className="nl-btn" onClick={listening?stopVoice:startVoice} disabled={transcribing}
+            style={{ display:"flex", alignItems:"center", gap:8, background:listening?T.red:T.panel2,
+              color:listening?"#fff":(transcribing?T.faint:T.text), border:`1px solid ${T.line}`,
+              borderRadius:9, padding:"10px 14px", cursor:transcribing?"default":"pointer", fontSize:12 }}>
+            {transcribing ? <Activity size={15} className="escpulse"/> : <Mic size={15}/>}
+            {transcribing ? "Transcribing…" : (listening ? "Stop" : "Speak")}
           </button>
           <button className="nl-btn" onClick={()=>fileComplaint()} disabled={busy||!draft.trim()}
             style={{ display:"flex", alignItems:"center", gap:8, marginLeft:"auto",

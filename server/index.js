@@ -5,12 +5,26 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { initNeo4j, neo4jEnabled, neo4jConnected, mirrorComplaint, getGraphStats } from "./neo4j.js";
 import rateLimit from "express-rate-limit";
+import { SarvamAIClient } from "sarvamai";
 
 const PORT = process.env.PORT || 8787;
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || "";
 const ANTHROPIC_MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6";
 const CLAUDE_RATE_MAX = Number(process.env.CLAUDE_RATE_MAX || 20); // req/min/IP
 const BODY_LIMIT = process.env.BODY_LIMIT || "100kb";              // request body cap
+
+/* SARVAM seam — server-side Indic ASR proxy, guarded by USE_SARVAM. The browser
+   records audio and posts it here; the key stays server-side, exactly like the
+   Claude proxy. When the seam is off or misconfigured, /api/transcribe 503s and
+   the frontend falls back to the browser recognizer, so voice always works. */
+const truthy = (v) => String(v).toLowerCase() === "true";
+const USE_SARVAM = truthy(process.env.USE_SARVAM);
+const SARVAM_API_KEY = process.env.SARVAM_API_KEY || "";
+const SARVAM_RATE_MAX = Number(process.env.SARVAM_RATE_MAX || 20); // req/min/IP
+const AUDIO_BODY_LIMIT = process.env.AUDIO_BODY_LIMIT || "8mb";    // audio upload cap
+const SARVAM_MODEL = process.env.SARVAM_MODEL || "saaras:v3";      // per Sarvam STT docs
+const sarvamReady = USE_SARVAM && Boolean(SARVAM_API_KEY);
+const sarvamClient = sarvamReady ? new SarvamAIClient({ apiSubscriptionKey: SARVAM_API_KEY }) : null;
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = path.join(__dirname, "data");
@@ -40,8 +54,17 @@ const claudeLimiter = rateLimit({
   message: { error: "rate limit exceeded — try again in a minute" },
 });
 
+/* Same discipline as the Claude limiter — transcribe hits a paid partner API. */
+const sarvamLimiter = rateLimit({
+  windowMs: 60_000,
+  max: SARVAM_RATE_MAX,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "rate limit exceeded — try again in a minute" },
+});
+
 app.get("/api/health", (_req, res) => {
-  res.json({ ok: true, keyLoaded: Boolean(ANTHROPIC_API_KEY) });
+  res.json({ ok: true, keyLoaded: Boolean(ANTHROPIC_API_KEY), sarvam: sarvamReady });
 });
 
 /* GET returns the persisted collection; POST replaces it (full-array upsert),
@@ -85,6 +108,53 @@ app.get("/api/graph/stats", async (_req, res) => {
     res.status(500).json({ error: err.message || "graph query failed", connected: true });
   }
 });
+
+/* SARVAM seam: transcribe browser-recorded audio via Sarvam's Indic ASR. The
+   browser POSTs the raw audio blob (MediaRecorder → usually audio/webm) with a
+   ?language=<BCP-47> hint; we forward it to Sarvam with the key held server-side
+   and return { transcript }. 503s when the seam is off so the frontend falls
+   back to the browser recognizer. Uses express.raw (not express.json) to read
+   the binary body, with its own larger, dedicated size cap. */
+app.post("/api/transcribe",
+  sarvamLimiter,
+  express.raw({ type: () => true, limit: AUDIO_BODY_LIMIT }),
+  async (req, res) => {
+    if (!sarvamReady || !sarvamClient) {
+      return res.status(503).json({ error: "sarvam not configured", enabled: false });
+    }
+    const audio = req.body;
+    if (!Buffer.isBuffer(audio) || audio.length === 0) {
+      return res.status(400).json({ error: "audio body is required" });
+    }
+    // Strip any codec parameter (e.g. "audio/webm;codecs=opus") — Sarvam matches
+    // the MIME against an exact allowlist, and the ";codecs=…" suffix breaks it.
+    const contentType = (req.headers["content-type"] || "audio/webm").split(";")[0].trim() || "audio/webm";
+    const ext = contentType.includes("wav") ? "wav"
+      : contentType.includes("ogg") ? "ogg"
+      : contentType.includes("mpeg") || contentType.includes("mp3") ? "mp3"
+      : contentType.includes("mp4") || contentType.includes("m4a") ? "m4a"
+      : "webm";
+    const language = typeof req.query.language === "string" && req.query.language
+      ? req.query.language : "unknown";
+    try {
+      // file accepts a Buffer with metadata — no fs stream needed for browser audio.
+      const params = {
+        file: { data: audio, filename: `recording.${ext}`, contentType },
+        model: SARVAM_MODEL,
+        language_code: language,
+      };
+      if (SARVAM_MODEL.startsWith("saaras")) params.mode = "transcribe"; // mode is saaras-only
+      const result = await sarvamClient.speechToText.transcribe(params);
+      res.json({ transcript: result.transcript || "", language_code: result.language_code || null });
+    } catch {
+      // Deliberately generic — never surface upstream error text (avoids any
+      // chance of leaking request/key context). The non-200 is enough for the
+      // frontend to fall back to the browser recognizer.
+      console.warn("[sarvam] transcription failed");
+      res.status(502).json({ error: "transcription failed" });
+    }
+  }
+);
 
 /* Proxies a single Claude messages call. The browser never sees the API key. */
 app.post("/api/claude", claudeLimiter, async (req, res) => {
