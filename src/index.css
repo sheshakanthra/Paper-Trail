@@ -1,0 +1,67 @@
+@import url('https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700,900&f[]=clash-display@500,600,700&f[]=general-sans@400,500,600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html, body, #root { height: 100%; }
+  body {
+    margin: 0;
+    background: #05070B;
+    color: #EDEFF5;
+    font-family: 'Satoshi', 'General Sans', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  ::selection { background: #F6A623; color: #05070B; }
+
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,0.12); border-radius: 9px;
+    border: 2px solid transparent; background-clip: content-box;
+  }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.22); background-clip: content-box; }
+
+  :focus-visible { outline: 2px solid #F6A623; outline-offset: 2px; border-radius: 10px; }
+}
+
+@layer components {
+  /* frosted glass panel — the base layer for every card/panel */
+  .glass {
+    position: relative;
+    background: linear-gradient(158deg, rgba(32,41,56,0.55) 0%, rgba(21,26,35,0.6) 55%, rgba(13,17,23,0.7) 100%);
+    backdrop-filter: blur(18px) saturate(140%);
+    -webkit-backdrop-filter: blur(18px) saturate(140%);
+    border: 1px solid rgba(255,255,255,0.08);
+    box-shadow: 0 1px 0 0 rgba(255,255,255,0.06) inset, 0 24px 60px -34px rgba(0,0,0,0.9);
+  }
+  /* gradient hairline border highlight (top-left catches light) */
+  .glass::before {
+    content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1px; pointer-events: none;
+    background: linear-gradient(150deg, rgba(255,255,255,0.16), rgba(255,255,255,0) 45%);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor; mask-composite: exclude;
+  }
+  .glass-flat {
+    background: linear-gradient(158deg, rgba(21,26,35,0.55), rgba(13,17,23,0.65));
+    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    border: 1px solid rgba(255,255,255,0.07);
+  }
+}
+
+@layer utilities {
+  .grad-text {
+    background: linear-gradient(120deg, #F6A623, #FF8C42);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .noise {
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  .flowdash { stroke-dasharray: 5 5; animation: dashmove .9s linear infinite; }
+  .sonar-ring { transform-box: fill-box; transform-origin: center; animation: sonar 1.9s ease-out infinite; }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition-duration: .01ms !important; }
+  }
+}

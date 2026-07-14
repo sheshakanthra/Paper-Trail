@@ -498,8 +498,12 @@ export default function NyayaLoop() {
         @keyframes pulse{0%,100%{opacity:.4}50%{opacity:1}}
         @keyframes dash{to{stroke-dashoffset:-16}}
         @keyframes rec{0%,100%{opacity:1}50%{opacity:.25}}
-        .flow{stroke-dasharray:5 5;animation:dash 1s linear infinite}
+        .flow{stroke-dasharray:5 5;animation:dash .9s linear infinite}
         .escpulse{animation:pulse 1.1s ease-in-out infinite}
+
+        /* pressure chain — the live "pressure front" at the current stage */
+        @keyframes sonar{0%{transform:scale(.75);opacity:.7}100%{transform:scale(2.5);opacity:0}}
+        .nl-sonar{transform-box:fill-box;transform-origin:center;animation:sonar 1.9s ease-out infinite}
 
         /* responsive — stack the two-column panels below tablet width */
         .nl-split{display:grid;gap:18px;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr)}
@@ -572,7 +576,7 @@ export default function NyayaLoop() {
         ))}
         <span className="nl-mono" style={{ marginLeft:"auto", fontSize:10, color:T.faint, letterSpacing:.5, display:"flex", gap:7, alignItems:"center" }}>
           <span style={{ width:6, height:6, borderRadius:9, background:T.teal, boxShadow:`0 0 8px ${T.teal}` }}/>
-          AI routing · Sarvam · Neo4j · Render
+          AI routing · Sarvam
         </span>
       </div>
 
@@ -680,6 +684,7 @@ function GraphPanel({ stats, complaints, selected, setSelectedId, resolve, day, 
   const cit={x:60}, dept={x:185};
   const stageX=[330,455,575,680];
   const sel = selected && selected.status==="open" ? selected : null;
+  const tipX = sel ? stageX[sel.escLevel] : null;   // x of the current pressure front
   const open = complaints.filter(c=>c.status==="open");
   /* Optional-chaining + default so a null / partial payload never throws. */
   const underPressure = (graphStats?.officialsUnderPressure ?? []).slice(0, 4);
@@ -697,45 +702,92 @@ function GraphPanel({ stats, complaints, selected, setSelectedId, resolve, day, 
               </span>
             : <span>Neo4j graph mirror unavailable — showing the local pressure view</span>}
         </div>
-        <div style={{ fontSize:11, color:T.dim, padding:"2px 4px 10px" }}>
-          escalation climbs <span style={{ color:T.gold }}>outward</span> — each step makes ignoring the citizen cost more
-        </div>
+        {/* live pressure readout — names the current stage in plain words */}
+        {sel ? (
+          <div style={{ display:"flex", alignItems:"center", gap:11, padding:"2px 4px 12px", flexWrap:"wrap" }}>
+            <span className="nl-mono" style={{ fontSize:9.5, letterSpacing:1.5, color:T.faint }}>PRESSURE</span>
+            <span className="nl-display" style={{ fontSize:16, fontWeight:700, lineHeight:1, color:STAGES[sel.escLevel].color, textShadow:`0 0 20px ${STAGES[sel.escLevel].color}66` }}>
+              {STAGES[sel.escLevel].label}
+            </span>
+            <span style={{ fontSize:11.5, color:T.dim }}>· {STAGES[sel.escLevel].cost}</span>
+            <span className="nl-mono" style={{ marginLeft:"auto", fontSize:10, color:T.faint }}>
+              {sel.id} · {day - sel.filedDay}d unaddressed
+            </span>
+          </div>
+        ) : (
+          <div style={{ fontSize:11.5, color:T.dim, padding:"2px 4px 12px", lineHeight:1.5 }}>
+            Escalation climbs <span style={{ color:T.gold }}>outward</span> — each ignored day makes the department pay more. Pick an open complaint to trace its pressure.
+          </div>
+        )}
         <svg viewBox={`0 0 ${W} ${H}`} style={{ width:"100%", height:"auto" }}>
-          {/* spine edges */}
-          <line x1={cit.x+20} y1={midY} x2={dept.x-32} y2={midY} stroke={sel?DEPTS[sel.deptId].hue:T.line} strokeWidth={sel?2.2:1.4} className={sel?"flow":""} opacity={sel?1:0.5}/>
-          {stageX.map((x,i)=>{
-            const fromX = i===0 ? dept.x+34 : stageX[i-1]+34;
-            const reached = sel && sel.escLevel>=i;
-            return <line key={"sp"+i} x1={fromX} y1={midY} x2={x-34} y2={midY}
-              stroke={reached?STAGES[i].color:T.line} strokeWidth={reached?2.4:1.2} className={reached?"flow":""} opacity={reached?1:0.45}/>;
-          })}
+          <defs>
+            {/* the heat scale — one continuous gradient mapped to absolute x, so the
+                filled pipe always shows the correct slice of cool→hot */}
+            <linearGradient id="nl-heat" gradientUnits="userSpaceOnUse" x1={cit.x} y1="0" x2={stageX[3]} y2="0">
+              <stop offset="0%" stopColor={T.teal}/>
+              <stop offset="20%" stopColor="#38c8c0"/>
+              <stop offset="44%" stopColor={T.gold}/>
+              <stop offset="64%" stopColor={T.orange}/>
+              <stop offset="83%" stopColor={T.red}/>
+              <stop offset="100%" stopColor={T.violet}/>
+            </linearGradient>
+            <filter id="nl-glow" x="-70%" y="-70%" width="240%" height="240%">
+              <feGaussianBlur stdDeviation="4.5" result="b"/>
+              <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+            </filter>
+          </defs>
 
-          {/* citizen */}
-          <circle cx={cit.x} cy={midY} r={20} fill={T.panel2} stroke={T.gold} strokeWidth={1.5}/>
-          <text x={cit.x} y={midY+4} fill={T.text} fontSize="9" textAnchor="middle" fontFamily="monospace">YOU</text>
-          <text x={cit.x} y={midY+36} fill={T.faint} fontSize="8.5" textAnchor="middle" fontFamily="monospace">citizen</text>
+          {/* base track */}
+          <line x1={cit.x} y1={midY} x2={stageX[3]} y2={midY} stroke={T.line} strokeWidth={3} strokeLinecap="round" opacity={0.5}/>
 
-          {/* department */}
-          <circle cx={dept.x} cy={midY} r={28} fill={T.panel2} stroke={sel?DEPTS[sel.deptId].hue:T.line} strokeWidth={sel?2.4:1.4}/>
-          <text x={dept.x} y={midY-2} fill={T.text} fontSize="9.5" textAnchor="middle" fontFamily="monospace">{sel?DEPTS[sel.deptId].name.split(" ")[0]:"Dept"}</text>
-          <text x={dept.x} y={midY+11} fill={T.dim} fontSize="8" textAnchor="middle" fontFamily="monospace">{sel?DEPTS[sel.deptId].sla+"d SLA":"—"}</text>
-          <text x={dept.x} y={midY+44} fill={T.faint} fontSize="8.5" textAnchor="middle" fontFamily="monospace">internal</text>
+          {/* heated pipe — fills only up to the current pressure front */}
+          {sel && <>
+            <line x1={cit.x} y1={midY} x2={tipX} y2={midY} stroke="url(#nl-heat)" strokeWidth={5} strokeLinecap="round" filter="url(#nl-glow)" opacity={0.9}/>
+            <line x1={cit.x} y1={midY} x2={tipX} y2={midY} stroke="url(#nl-heat)" strokeWidth={2} strokeLinecap="round" className="flow"/>
+          </>}
+
+          {/* threshold — where the grievance leaves the bureaucracy and goes public */}
+          <line x1={257} y1={midY-40} x2={257} y2={midY+40} stroke={T.line} strokeWidth={1} strokeDasharray="3 4" opacity={0.75}/>
+          <text x={257} y={midY-46} fill={T.faint} fontSize="7.5" textAnchor="middle" fontFamily="monospace" letterSpacing="0.4">leaves the bureaucracy</text>
+
+          {/* citizen — cool origin */}
+          <circle cx={cit.x} cy={midY} r={18} fill="#0f1c1b" stroke={T.teal} strokeWidth={1.8}/>
+          <text x={cit.x} y={midY+3.5} fill={T.teal} fontSize="8.5" textAnchor="middle" fontFamily="monospace" fontWeight="700">YOU</text>
+          <text x={cit.x} y={midY+34} fill={T.faint} fontSize="8" textAnchor="middle" fontFamily="monospace">citizen</text>
+
+          {/* department — the internal boundary */}
+          <circle cx={dept.x} cy={midY} r={26} fill={T.panel2} stroke={sel?DEPTS[sel.deptId].hue:T.line} strokeWidth={sel?2.4:1.5}/>
+          <text x={dept.x} y={midY-3} fill={T.text} fontSize="9.5" textAnchor="middle" fontFamily="monospace" fontWeight="600">{sel?DEPTS[sel.deptId].name.split(" ")[0]:"Dept"}</text>
+          <text x={dept.x} y={midY+10} fill={T.dim} fontSize="8" textAnchor="middle" fontFamily="monospace">{sel?DEPTS[sel.deptId].sla+"d SLA":"—"}</text>
+          <text x={dept.x} y={midY+42} fill={T.faint} fontSize="8" textAnchor="middle" fontFamily="monospace">internal</text>
 
           {/* outward pressure stages */}
           {STAGES.map((s,i)=>{
             const x=stageX[i], reached=sel&&sel.escLevel>=i, tip=sel&&sel.escLevel===i;
+            const key=["FILE","FLAG","RTI","REP"][i], r=tip?24:reached?22:20;
             return (
-              <g key={s.key} className={tip?"escpulse":""}>
-                <circle cx={x} cy={midY} r={24} fill={reached?(tip?s.color:T.panel2):T.panel2}
-                  stroke={reached?s.color:T.line} strokeWidth={tip?3:1.4} opacity={reached?1:0.5}/>
-                <text x={x} y={midY+4} fill={reached?(tip?"#000":s.color):T.faint} fontSize="9" textAnchor="middle" fontFamily="monospace" fontWeight="700">{i===0?"FILE":i===1?"FLAG":i===2?"RTI":"REP"}</text>
-                <text x={x} y={midY-34} fill={reached?s.color:T.faint} fontSize="9" textAnchor="middle" fontFamily="monospace">{s.label}</text>
-                <text x={x} y={midY+42} fill={reached?T.dim:T.faint} fontSize="8" textAnchor="middle" fontFamily="monospace">{s.cost}</text>
+              <g key={s.key}>
+                {tip && <>
+                  <circle cx={x} cy={midY} r={22} fill="none" stroke={s.color} strokeWidth={2} className="nl-sonar"/>
+                  <circle cx={x} cy={midY} r={22} fill="none" stroke={s.color} strokeWidth={2} className="nl-sonar" style={{ animationDelay:".95s" }}/>
+                </>}
+                <circle cx={x} cy={midY} r={r} fill={reached?s.color:T.panel2}
+                  stroke={reached?s.color:T.line} strokeWidth={reached?2:1.4}
+                  filter={reached?"url(#nl-glow)":undefined} opacity={reached?1:0.6}/>
+                <text x={x} y={midY+3.5} fill={reached?"#0b0a14":T.faint} fontSize="9" textAnchor="middle" fontFamily="monospace" fontWeight="700">{key}</text>
+                <text x={x} y={midY-32} fill={reached?s.color:T.faint} fontSize="9" textAnchor="middle" fontFamily="monospace" fontWeight={reached?"600":"400"}>{s.label}</text>
+                <text x={x} y={midY+40} fill={reached?T.dim:T.faint} fontSize="7.8" textAnchor="middle" fontFamily="monospace">{s.cost}</text>
               </g>
             );
           })}
-          {!sel && <text x={W/2} y={H-12} fill={T.faint} fontSize="9.5" textAnchor="middle" fontFamily="monospace">select an open complaint to trace its pressure →</text>}
         </svg>
+
+        {/* heat scale legend — the cool→hot metaphor made explicit */}
+        <div className="nl-mono" style={{ display:"flex", alignItems:"center", gap:9, padding:"8px 6px 2px", fontSize:9, color:T.faint }}>
+          <span>cool · internal</span>
+          <span style={{ flex:1, height:4, borderRadius:9, background:GRAD.pressure }}/>
+          <span>hot · electoral</span>
+        </div>
 
         {sel && sel.escLevel>=2 && (
           <button className="nl-btn" onClick={()=>openRTI(sel)}
