@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
-  Mic, Send, Network, ShieldAlert, Play, Pause, FastForward, CheckCircle2,
-  Languages, Zap, Radio, Activity, Eye, Scale, Vote, FileText, Copy, Sparkles
+  Mic, Send, ShieldAlert, Play, Pause, FastForward, CheckCircle2,
+  Activity, Eye, Scale, Vote, FileText, Copy, Sparkles, Square
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell, Tooltip, LabelList } from "recharts";
 
@@ -13,28 +13,25 @@ import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell, Tooltip, LabelL
    Partner seams (stubbed, real call marked):
      SARVAM → Indic ASR · NEO4J → property graph store · RENDER → durable escalation/RTI workflows
    AI routing + RTI drafting are live via the Anthropic API, with offline fallbacks.
+
+   Presentation: a government case-file / docket system. Paper, ink, ruled forms,
+   rubber stamps. No logic here changed — only structure, classNames and colour.
    ────────────────────────────────────────────────────────────────────────── */
 
-const T = {
-  bg:"#080711", panel:"#14131f", panel2:"#1a1928", line:"#2c2b3d",
-  text:"#f2f1f8", dim:"#9c9ab4", faint:"#6f6d88",
-  gold:"#f0b429", goldHi:"#ffd45e", violet:"#8b6dff", teal:"#2fd6a6",
-  red:"#ff4d6d", orange:"#ff8a3d", blue:"#4d9fff", magenta:"#e15bd8",
-};
-/* the pressure gradient — the app's one signature: escalation as rising heat */
-const GRAD = {
-  pressure:`linear-gradient(90deg,${T.teal},${T.gold},${T.orange},${T.red},${T.violet})`,
-  panel:"linear-gradient(158deg,#1b1a2b 0%,#121120 55%,#0d0c18 100%)",
-  gold:`linear-gradient(135deg,${T.gold},${T.goldHi})`,
-  brand:`linear-gradient(135deg,${T.gold} 0%,${T.orange} 40%,${T.violet} 100%)`,
+/* docket palette — used only for data-driven colour (departments, stages, urgency) */
+const C = {
+  paper:"#f3efe6", paper2:"#ece7db", paperCard:"#faf7ef",
+  ink:"#1c1a15", inkSoft:"#57524a", inkFaint:"#8d8779",
+  rule:"#d8d1c0", ruleDark:"#b9b09a",
+  red:"#b3372c", blue:"#1f4e79", green:"#2e6b45", amber:"#a06b1e",
 };
 
 const DEPTS = {
-  water:      { name:"Water Board",       official:"Asst. Engineer", sla:3, hue:T.blue },
-  roads:      { name:"Roads & Highways",  official:"Junior Engineer", sla:5, hue:T.gold },
-  power:      { name:"Electricity Board", official:"Section Officer", sla:2, hue:T.goldHi },
-  sanitation: { name:"Sanitation",        official:"Sanitary Insp.",  sla:2, hue:T.teal },
-  health:     { name:"Public Health",     official:"Health Officer",  sla:4, hue:T.violet },
+  water:      { name:"Water Board",       official:"Asst. Engineer", sla:3, hue:C.blue },
+  roads:      { name:"Roads & Highways",  official:"Junior Engineer", sla:5, hue:C.amber },
+  power:      { name:"Electricity Board", official:"Section Officer", sla:2, hue:C.red },
+  sanitation: { name:"Sanitation",        official:"Sanitary Insp.",  sla:2, hue:C.green },
+  health:     { name:"Public Health",     official:"Health Officer",  sla:4, hue:C.inkSoft },
 };
 const DEPT_IDS = Object.keys(DEPTS);
 
@@ -48,10 +45,10 @@ const WARD_IDS = Object.keys(WARDS);
 
 /* outward pressure chain — each step costs the department more */
 const STAGES = [
-  { key:"filed", label:"Filed",        cost:"ignorable",          color:T.gold,   Icon:FileText },
-  { key:"flag",  label:"Public flag",  cost:"now visible",        color:T.orange, Icon:Eye },
-  { key:"rti",   label:"RTI filed",    cost:"legally on record",  color:T.red,    Icon:Scale },
-  { key:"rep",   label:"Rep + pattern",cost:"electoral cost",     color:T.violet, Icon:Vote },
+  { key:"filed", label:"Filed",        cost:"ignorable",          color:C.amber, Icon:FileText },
+  { key:"flag",  label:"Public flag",  cost:"now visible",        color:C.blue,  Icon:Eye },
+  { key:"rti",   label:"RTI filed",    cost:"legally on record",  color:C.red,   Icon:Scale },
+  { key:"rep",   label:"Rep + pattern",cost:"electoral cost",     color:C.ink,   Icon:Vote },
 ];
 
 const LANGS = [
@@ -79,7 +76,7 @@ function syncUid(complaints) {
   }
 }
 const expectedLevel = (day, filedDay, sla) => Math.min(3, Math.floor((day - filedDay) / sla));
-const URG_COLOR = { low:T.dim, medium:T.gold, high:T.orange, critical:T.red };
+const URG_COLOR = { low:C.inkFaint, medium:C.amber, high:C.red, critical:C.red };
 
 function buildTimeline(deptId, filedDay, level, status, resolvedDay) {
   const d = DEPTS[deptId];
@@ -214,8 +211,11 @@ class GraphErrorBoundary extends React.Component {
   render() {
     if (this.state.failed) {
       return (
-        <div style={{ background:GRAD.panel, boxShadow:"0 24px 60px -34px rgba(0,0,0,.9), 0 1px 0 0 rgba(255,255,255,.045) inset", border:`1px solid ${T.line}`, borderRadius:14, padding:18, fontSize:12, color:T.dim }}>
-          The pressure-chain view hit an error and was contained. The rest of NyayaLoop is unaffected — reselect a complaint or switch tabs.
+        <div className="folder" style={{ padding:18 }}>
+          <div className="label-mono" style={{ color:C.red, marginBottom:6 }}>Register unavailable</div>
+          <div className="u-sans" style={{ fontSize:13, color:C.inkSoft }}>
+            The escalation register hit an error and was contained. The rest of NyayaLoop is unaffected — reselect a case or switch tabs.
+          </div>
         </div>
       );
     }
@@ -459,450 +459,454 @@ export default function NyayaLoop() {
   const openC = complaints.filter(c=>c.status==="open");
   const flags = openC.filter(c=>c.escLevel>=1).length;
   const rtis = openC.filter(c=>c.escLevel>=2).length;
+  const resolvedCount = complaints.filter(c=>c.status==="resolved").length;
   const selected = complaints.find(c=>c.id===selectedId) || null;
+  const caseNo = `NL/2026/${String(complaints.length).padStart(4,"0")}`;
+
+  const TABS = [["file","Statement"],["graph","Escalation register"],["pattern","Case index"]];
 
   return (
-    <div style={{ background:`radial-gradient(1200px 600px at 15% -10%, #1a1636 0%, transparent 55%), radial-gradient(1000px 560px at 92% 0%, #14243a 0%, transparent 50%), radial-gradient(1100px 520px at 50% 120%, #1a0e22 0%, transparent 60%), ${T.bg}`, color:T.text, minHeight:660, fontFamily:"'Inter', ui-sans-serif, system-ui, sans-serif" }}>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
-        *{box-sizing:border-box}
-        ::selection{background:${T.gold};color:#000}
-        .nl-display{font-family:'Space Grotesk','Inter',sans-serif}
-        .nl-mono{font-family:'JetBrains Mono',ui-monospace,monospace}
+    <div className="page-rules" style={{ minHeight:"100vh" }}>
+      <div style={{ maxWidth:1400, margin:"0 auto", padding:"0 20px 40px" }}>
 
-        /* scrollbars in-theme */
-        *::-webkit-scrollbar{width:10px;height:10px}
-        *::-webkit-scrollbar-thumb{background:${T.line};border-radius:9px;border:2px solid transparent;background-clip:content-box}
-        *::-webkit-scrollbar-thumb:hover{background:${T.faint};background-clip:content-box}
-
-        /* glass panel — subtle top highlight + colored ambient depth */
-        .nl-panel{position:relative;background:${GRAD.panel};border:1px solid ${T.line};border-radius:14px;
-          box-shadow:0 24px 60px -34px rgba(0,0,0,.9),0 1px 0 0 rgba(255,255,255,.04) inset}
-        .nl-panel::before{content:"";position:absolute;inset:0;border-radius:14px;padding:1px;pointer-events:none;
-          background:linear-gradient(160deg,rgba(255,255,255,.10),rgba(255,255,255,0) 40%);
-          -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude}
-
-        /* micro-interactions — transform / colour only, ~150–180ms, clear press feedback */
-        .nl-btn{transition:transform .15s ease,background .18s ease,border-color .18s ease,filter .18s ease,box-shadow .18s ease}
-        .nl-btn:hover:not(:disabled){filter:brightness(1.12)}
-        .nl-btn:active:not(:disabled){transform:translateY(1px)}
-        .nl-chip{transition:border-color .18s ease,color .18s ease,background .18s ease}
-        .nl-chip:hover{border-color:${T.gold};color:${T.text};background:${T.panel2}}
-        .nl-tab{transition:color .18s ease,border-color .18s ease}
-        .nl-tab:hover{color:${T.text}}
-
-        /* selectable complaint cards — a lift that never shifts neighbouring content */
-        .nl-card{transition:transform .15s ease,box-shadow .18s ease,border-color .18s ease}
-        .nl-card:hover{transform:translateY(-1px);box-shadow:0 6px 16px -8px rgba(0,0,0,.55)}
-
-        @keyframes pulse{0%,100%{opacity:.4}50%{opacity:1}}
-        @keyframes dash{to{stroke-dashoffset:-16}}
-        @keyframes rec{0%,100%{opacity:1}50%{opacity:.25}}
-        .flow{stroke-dasharray:5 5;animation:dash .9s linear infinite}
-        .escpulse{animation:pulse 1.1s ease-in-out infinite}
-
-        /* pressure chain — the live "pressure front" at the current stage */
-        @keyframes sonar{0%{transform:scale(.75);opacity:.7}100%{transform:scale(2.5);opacity:0}}
-        .nl-sonar{transform-box:fill-box;transform-origin:center;animation:sonar 1.9s ease-out infinite}
-
-        /* responsive — stack the two-column panels below tablet width */
-        .nl-split{display:grid;gap:18px;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr)}
-        .nl-split.wide{grid-template-columns:minmax(0,1.55fr) minmax(0,1fr)}
-        @media (max-width:760px){.nl-split,.nl-split.wide{grid-template-columns:1fr}}
-
-        /* accessibility — visible keyboard focus on every interactive surface; honour reduced-motion */
-        textarea,select{font-family:inherit}
-        textarea:focus,select:focus,button:focus-visible,[role="button"]:focus-visible{outline:2px solid ${T.gold};outline-offset:2px;border-radius:8px}
-        @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
-
-        /* signature — the pressure gradient, animated */
-        @keyframes flow-grad{0%{background-position:0% 50%}100%{background-position:200% 50%}}
-        .nl-accent{height:3px;background:${GRAD.pressure};background-size:200% 100%;animation:flow-grad 8s linear infinite;opacity:.9}
-        .nl-gradtext{background:${GRAD.brand};-webkit-background-clip:text;background-clip:text;color:transparent}
-
-        .nl-stat{display:inline-flex;align-items:center;gap:9px;padding:8px 14px;background:linear-gradient(180deg,${T.panel2},${T.panel});border:1px solid ${T.line};border-radius:999px;transition:border-color .18s ease,transform .15s ease,box-shadow .18s ease}
-        .nl-stat:hover{border-color:${T.dim};transform:translateY(-1px);box-shadow:0 8px 22px -14px rgba(0,0,0,.9)}
-        .nl-stat b{font-size:16px;font-weight:700;line-height:1;font-family:'JetBrains Mono',monospace}
-        .nl-dot{width:9px;height:9px;border-radius:9px;flex:none}
-      `}</style>
-
-      {/* top bar */}
-      <div style={{ background:"linear-gradient(180deg,rgba(24,22,42,.85),rgba(12,11,22,.6))", backdropFilter:"blur(10px)", borderBottom:`1px solid ${T.line}`, padding:"16px 22px", display:"flex", alignItems:"center", gap:18, flexWrap:"wrap" }}>
-        <div style={{ display:"flex", alignItems:"center", gap:13 }}>
-          <div style={{ width:38, height:38, borderRadius:11, background:GRAD.brand, display:"grid", placeItems:"center", boxShadow:`0 0 26px -4px ${T.violet}, 0 6px 18px -8px ${T.gold}` }}>
-            <Network size={21} color="#0b0a14" strokeWidth={2.4} />
-          </div>
+        {/* ── MASTHEAD ── */}
+        <header className="masthead" style={{ display:"flex", alignItems:"flex-end", justifyContent:"space-between",
+          gap:20, flexWrap:"wrap", padding:"18px 0 14px", marginTop:14 }}>
           <div>
-            <div className="nl-display" style={{ fontWeight:700, letterSpacing:1.5, fontSize:20, lineHeight:1 }}>NYAYA<span className="nl-gradtext">LOOP</span></div>
-            <div style={{ fontSize:10, color:T.faint, letterSpacing:1.5, marginTop:3, textTransform:"uppercase" }}>inaction has a price</div>
+            <div className="u-serif" style={{ fontSize:42, lineHeight:1, fontWeight:600, letterSpacing:"-.5px" }}>
+              Nyaya<span style={{ fontStyle:"italic", fontWeight:400 }}>loop</span>
+            </div>
+            <div className="eyebrow" style={{ marginTop:8 }}>Office of Civic Grievance &amp; Accountability</div>
+          </div>
+          <div style={{ textAlign:"right" }}>
+            <div className="label-mono">Case file no.</div>
+            <div className="u-mono" style={{ fontSize:13, letterSpacing:1, marginTop:2 }}>{caseNo}</div>
+            <div className="u-serif" style={{ fontSize:30, fontWeight:600, marginTop:6, lineHeight:1 }}>
+              Day {day}
+            </div>
+          </div>
+        </header>
+
+        {/* ── CONTROL BAR ── */}
+        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:14,
+          flexWrap:"wrap", padding:"12px 0", borderBottom:`1px solid ${C.rule}` }}>
+          <div className="label-mono" style={{ display:"flex", alignItems:"center", gap:9 }}>
+            <span style={{ width:7, height:7, borderRadius:9, background:C.green, display:"inline-block" }} className="blink"/>
+            AI routing · Sarvam ASR · on record
+          </div>
+          <div style={{ display:"flex", alignItems:"center", gap:12, flexWrap:"wrap" }}>
+            <div className="coupon">
+              <span className="u-serif" style={{ fontStyle:"italic", fontSize:13, color:C.inkSoft }}>
+                Simulation engine
+              </span>
+              <button onClick={()=>setPlaying(p=>!p)} aria-pressed={playing}
+                className="u-mono" style={{ textTransform:"uppercase", letterSpacing:"1.5px", fontSize:11,
+                  background:"none", border:"none", cursor:"pointer", color:C.red, display:"inline-flex",
+                  alignItems:"center", gap:6, fontWeight:500 }}>
+                {playing ? <Pause size={12}/> : <Play size={12}/>}{playing ? "Halt" : "Run"}
+              </button>
+            </div>
+            <button onClick={()=>setDay(d=>d+1)} aria-label="Advance one day" title="Advance one day"
+              className="btn-outline" style={{ padding:"9px 12px" }}>
+              <FastForward size={13}/> +1 day
+            </button>
           </div>
         </div>
-        <div style={{ display:"flex", gap:4, marginLeft:10 }}>
-          {[["file","File"],["graph","Pressure chain"],["pattern","Pattern, not incident"]].map(([k,l]) => (
-            <button key={k} onClick={()=>setTab(k)} className="nl-btn nl-tab nl-display" aria-current={tab===k?"page":undefined}
-              style={{ background:tab===k?T.panel2:"none", border:`1px solid ${tab===k?T.line:"transparent"}`, cursor:"pointer", padding:"7px 13px", fontSize:12.5, fontWeight:600, borderRadius:9,
-                color:tab===k?T.text:T.dim, boxShadow:tab===k?`0 2px 12px -8px ${T.violet}`:"none" }}>{l}</button>
-          ))}
-        </div>
-        <div style={{ marginLeft:"auto", display:"flex", alignItems:"center", gap:10 }}>
-          <span className="nl-mono" style={{ fontSize:11, color:T.dim }}>Day <b style={{ color:T.text, fontWeight:600 }}>{day}</b></span>
-          <button className="nl-btn" onClick={()=>setPlaying(p=>!p)} aria-pressed={playing}
-            style={{ display:"flex", alignItems:"center", gap:6, background:playing?T.violet:T.panel2, color:playing?"#fff":T.text,
-              border:`1px solid ${T.line}`, borderRadius:7, padding:"6px 11px", cursor:"pointer", fontSize:11 }}>
-            {playing?<Pause size={13}/>:<Play size={13}/>}{playing?"Running":"Run engine"}
-          </button>
-          <button className="nl-btn" onClick={()=>setDay(d=>d+1)} aria-label="Advance one day" title="Advance one day"
-            style={{ display:"grid", placeItems:"center", background:T.panel2, color:T.text, border:`1px solid ${T.line}`, borderRadius:7, padding:"8px 10px", cursor:"pointer" }}>
-            <FastForward size={13}/>
-          </button>
-        </div>
-      </div>
 
-      <div className="nl-accent"/>
-
-      {/* status strip — stat pills */}
-      <div style={{ display:"flex", flexWrap:"wrap", alignItems:"center", gap:10, padding:"13px 20px", borderBottom:`1px solid ${T.line}`, background:"linear-gradient(180deg,rgba(20,19,31,.6),rgba(8,7,17,.2))" }}>
-        {[
-          [openC.length, "open", T.gold],
-          [flags, "publicly flagged", T.orange],
-          [rtis, "RTIs auto-filed", T.red],
-          [complaints.filter(c=>c.status==="resolved").length, "resolved", T.teal],
-        ].map(([n,label,color]) => (
-          <span key={label} className="nl-stat">
-            <span className="nl-dot" style={{ background:color, boxShadow:`0 0 10px -1px ${color}` }}/>
-            <b style={{ color:T.text }}>{n}</b>
-            <span style={{ fontSize:11, color:T.dim }}>{label}</span>
-          </span>
-        ))}
-        <span className="nl-mono" style={{ marginLeft:"auto", fontSize:10, color:T.faint, letterSpacing:.5, display:"flex", gap:7, alignItems:"center" }}>
-          <span style={{ width:6, height:6, borderRadius:9, background:T.teal, boxShadow:`0 0 8px ${T.teal}` }}/>
-          AI routing · Sarvam
-        </span>
-      </div>
-
-      <div style={{ padding:20 }}>
-        {tab==="file" && <FilePanel {...{lang,setLang,draft,setDraft,listening,transcribing,sarvamEnabled,startVoice,stopVoice,busy,fileComplaint,routeResult}} />}
-        {tab==="graph" && (
-          <GraphErrorBoundary>
-            <GraphPanel {...{stats,complaints,selected,setSelectedId,resolve,day,openRTI,graphAvailable,graphStats}} />
-          </GraphErrorBoundary>
-        )}
-        {tab==="pattern" && <Pattern {...{wardStats,best,worst}} />}
-      </div>
-
-      {rtiOpen && <RTIDrawer {...{ complaint:complaints.find(c=>c.id===rtiOpen), rtiText, rtiBusy, enhanceRTI, close:()=>setRtiOpen(null) }} />}
-    </div>
-  );
-}
-
-/* ───── FILE ───── */
-function FilePanel({ lang,setLang,draft,setDraft,listening,transcribing,sarvamEnabled,startVoice,stopVoice,busy,fileComplaint,routeResult }) {
-  return (
-    <div className="nl-split">
-      <div style={{ background:GRAD.panel, boxShadow:"0 24px 60px -34px rgba(0,0,0,.9), 0 1px 0 0 rgba(255,255,255,.045) inset", border:`1px solid ${T.line}`, borderRadius:14, padding:18 }}>
-        <div className="nl-display" style={{ fontSize:13.5, fontWeight:600, color:T.text, marginBottom:14, display:"flex", alignItems:"center", gap:9 }}>
-          <Radio size={15} color={T.gold}/> File a grievance <span style={{ color:T.dim, fontWeight:400, fontSize:12 }}>— speak or type, in any language</span>
-        </div>
-        <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:12 }}>
-          <Languages size={15} color={T.dim}/>
-          <select value={lang} onChange={e=>setLang(e.target.value)}
-            style={{ background:T.panel2, color:T.text, border:`1px solid ${T.line}`, borderRadius:8, padding:"7px 10px", fontSize:12 }}>
-            {LANGS.map(l=><option key={l.code} value={l.code}>{l.label}</option>)}
-          </select>
-          <span style={{ fontSize:10, color:sarvamEnabled?T.teal:T.faint }}>
-            {sarvamEnabled ? "Indic ASR via Sarvam — live" : "Indic ASR via Sarvam (browser fallback)"}
-          </span>
-        </div>
-        <div style={{ position:"relative" }}>
-          <textarea value={draft} onChange={e=>setDraft(e.target.value)} rows={4}
-            placeholder="e.g. No water in our street for four days…"
-            style={{ width:"100%", resize:"vertical", background:T.bg, color:T.text, border:`1px solid ${T.line}`, borderRadius:10, padding:"12px 14px", fontSize:13, lineHeight:1.5 }}/>
-          {listening && <span style={{ position:"absolute", top:12, right:14, display:"flex", alignItems:"center", gap:6, fontSize:10, color:T.red }}>
-            <span style={{ width:7, height:7, borderRadius:9, background:T.red, animation:"rec 1s infinite" }}/> listening</span>}
-        </div>
-        <div style={{ display:"flex", gap:10, marginTop:12 }}>
-          <button className="nl-btn" onClick={listening?stopVoice:startVoice} disabled={transcribing}
-            style={{ display:"flex", alignItems:"center", gap:8, background:listening?T.red:T.panel2,
-              color:listening?"#fff":(transcribing?T.faint:T.text), border:`1px solid ${T.line}`,
-              borderRadius:9, padding:"10px 14px", cursor:transcribing?"default":"pointer", fontSize:12 }}>
-            {transcribing ? <Activity size={15} className="escpulse"/> : <Mic size={15}/>}
-            {transcribing ? "Transcribing…" : (listening ? "Stop" : "Speak")}
-          </button>
-          <button className="nl-btn nl-display" onClick={()=>fileComplaint()} disabled={busy||!draft.trim()}
-            style={{ display:"flex", alignItems:"center", gap:8, marginLeft:"auto",
-              background:busy||!draft.trim()?T.panel2:GRAD.gold,
-              color:busy||!draft.trim()?T.faint:"#1a1305", fontWeight:700, border:"none", borderRadius:10, padding:"11px 20px",
-              boxShadow:busy||!draft.trim()?"none":`0 8px 24px -8px ${T.gold}, 0 2px 0 0 rgba(255,255,255,.25) inset`,
-              cursor:busy||!draft.trim()?"default":"pointer", fontSize:12.5 }}>
-            {busy?<Activity size={15} className="escpulse"/>:<Send size={15}/>}{busy?"Routing…":"File complaint"}
-          </button>
-        </div>
-        <div style={{ marginTop:16, borderTop:`1px solid ${T.line}`, paddingTop:14 }}>
-          <div style={{ fontSize:10, color:T.faint, marginBottom:8, letterSpacing:1 }}>TRY A SAMPLE</div>
-          <div style={{ display:"flex", flexWrap:"wrap", gap:8 }}>
-            {SAMPLES.map((s,i)=>(
-              <button key={i} className="nl-chip nl-btn" onClick={()=>{ setLang(s.lang); setDraft(s.text); }}
-                style={{ background:T.bg, color:T.dim, border:`1px solid ${T.line}`, borderRadius:20, padding:"6px 12px", cursor:"pointer", fontSize:11, maxWidth:280, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{s.text}</button>
+        {/* ── STATS LEDGER ── */}
+        <div style={{ marginTop:16 }}>
+          <div className="label-mono" style={{ marginBottom:7 }}>Register summary</div>
+          <div className="ledger">
+            {[
+              ["Open", openC.length, C.amber],
+              ["Publicly flagged", flags, C.blue],
+              ["RTIs on record", rtis, C.red],
+              ["Resolved", resolvedCount, C.green],
+            ].map(([label,n,color]) => (
+              <div key={label} className="ledger-cell">
+                <div className="ledger-num" style={{ color }}>{String(n).padStart(2,"0")}</div>
+                <div className="label-mono" style={{ marginTop:7 }}>{label}</div>
+              </div>
             ))}
           </div>
         </div>
-      </div>
-      <div style={{ background:GRAD.panel, boxShadow:"0 24px 60px -34px rgba(0,0,0,.9), 0 1px 0 0 rgba(255,255,255,.045) inset", border:`1px solid ${T.line}`, borderRadius:14, padding:18 }}>
-        <div className="nl-display" style={{ fontSize:13.5, fontWeight:600, color:T.text, marginBottom:14, display:"flex", alignItems:"center", gap:9 }}>
-          <Zap size={15} color={T.gold}/> Routing decision
+
+        {/* ── FOLDER TABS ── */}
+        <nav className="tabbar" style={{ marginTop:22, paddingLeft:4 }} aria-label="Case sections">
+          {TABS.map(([k,l]) => (
+            <button key={k} onClick={()=>setTab(k)}
+              className={`file-tab ${tab===k ? "file-tab--active" : ""}`}
+              aria-current={tab===k ? "page" : undefined}>{l}</button>
+          ))}
+        </nav>
+
+        {/* ── FOLDER BODY ── */}
+        <div className="folder" style={{ padding:22 }}>
+          {tab==="file" && <FilePanel {...{lang,setLang,draft,setDraft,listening,transcribing,sarvamEnabled,startVoice,stopVoice,busy,fileComplaint,routeResult,day}} />}
+          {tab==="graph" && (
+            <GraphErrorBoundary>
+              <GraphPanel {...{stats,complaints,selected,setSelectedId,resolve,day,openRTI,graphAvailable,graphStats}} />
+            </GraphErrorBoundary>
+          )}
+          {tab==="pattern" && <Pattern {...{wardStats,best,worst}} />}
         </div>
-        {!routeResult ? (
-          <div style={{ color:T.faint, fontSize:12, lineHeight:1.7 }}>
-            The AI classifies the complaint, routes it, sets urgency, and hands it to the engine. If the department ignores it past its SLA, the system escalates it <i>outward</i> — public flag, then an auto-filed RTI, then to your ward representative.
-          </div>
-        ) : (
-          <div>
-            <Row k="Department" v={<span style={{ color:DEPTS[routeResult.deptId].hue }}>{DEPTS[routeResult.deptId].name}</span>} />
-            <Row k="Ward" v={`${WARDS[routeResult.ward].name} · ${WARDS[routeResult.ward].rep}`} />
-            <Row k="Urgency" v={<span style={{ color:URG_COLOR[routeResult.urgency], textTransform:"uppercase" }}>{routeResult.urgency}</span>} />
-            <Row k="SLA" v={`${DEPTS[routeResult.deptId].sla} days → then escalates outward`} />
-            <div style={{ marginTop:12, padding:"10px 12px", background:T.bg, border:`1px solid ${T.line}`, borderRadius:9, fontSize:11.5, color:T.dim, lineHeight:1.6 }}>
-              <span style={{ color:T.gold }}>why ▸ </span>{routeResult.reason}
-            </div>
-            <div style={{ marginTop:12, fontSize:11, color:T.teal, display:"flex", alignItems:"center", gap:6 }}>
-              <CheckCircle2 size={13}/> Filed. Opening the pressure chain…
-            </div>
-          </div>
-        )}
+
+        <div className="label-mono" style={{ textAlign:"center", marginTop:24, color:C.inkFaint, lineHeight:1.8 }}>
+          This document is machine-generated · No signature required · Inaction has a price
+        </div>
       </div>
+
+      {rtiOpen && <RTIDrawer {...{ complaint:complaints.find(c=>c.id===rtiOpen), rtiText, rtiBusy, enhanceRTI, close:()=>setRtiOpen(null), day }} />}
     </div>
   );
 }
-function Row({ k, v }) {
-  return <div style={{ display:"flex", justifyContent:"space-between", padding:"8px 0", borderBottom:`1px solid ${T.line}`, fontSize:12.5 }}>
-    <span style={{ color:T.faint }}>{k}</span><span style={{ fontWeight:500 }}>{v}</span></div>;
+
+/* ───── FILE — Statement of grievance + Routing slip ───── */
+function FilePanel({ lang,setLang,draft,setDraft,listening,transcribing,sarvamEnabled,startVoice,stopVoice,busy,fileComplaint,routeResult,day }) {
+  return (
+    <div style={{ display:"grid", gap:26, gridTemplateColumns:"minmax(0,1.25fr) minmax(0,1fr)" }} className="filegrid">
+      <style>{`@media (max-width:820px){.filegrid{grid-template-columns:1fr!important}}`}</style>
+
+      {/* LEFT — the statement form */}
+      <section>
+        <div className="eyebrow" style={{ marginBottom:4 }}>Form NL-1 · Deposition</div>
+        <h2 className="u-serif" style={{ fontSize:24, fontWeight:600, margin:"0 0 16px" }}>Statement of grievance</h2>
+
+        <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:16, flexWrap:"wrap" }}>
+          <label className="label-mono">Language of record</label>
+          <select value={lang} onChange={e=>setLang(e.target.value)} className="form-select">
+            {LANGS.map(l=><option key={l.code} value={l.code}>{l.label}</option>)}
+          </select>
+          <span className="u-serif" style={{ fontStyle:"italic", fontSize:12.5, color:sarvamEnabled?C.green:C.inkFaint }}>
+            {sarvamEnabled ? "Indic ASR via Sarvam — on record" : "Indic ASR via Sarvam — browser fallback"}
+          </span>
+        </div>
+
+        <div className="ruled-form">
+          <textarea value={draft} onChange={e=>setDraft(e.target.value)} rows={4}
+            className="ruled-textarea"
+            placeholder="State the grievance in your own words…"/>
+          {listening && (
+            <span className="u-mono" style={{ position:"absolute", top:6, right:2, display:"flex",
+              alignItems:"center", gap:6, fontSize:10, letterSpacing:"1.5px", color:C.red, textTransform:"uppercase" }}>
+              <span className="blink" style={{ width:8, height:8, borderRadius:9, background:C.red }}/> Recording
+            </span>
+          )}
+        </div>
+
+        <div style={{ display:"flex", gap:12, marginTop:18, flexWrap:"wrap" }}>
+          <button className="btn-outline" onClick={listening?stopVoice:startVoice} disabled={transcribing}
+            style={ listening ? { borderColor:C.red, color:C.red } : undefined }>
+            {transcribing
+              ? <><Activity size={14} className="blink"/> Transcribing…</>
+              : listening
+                ? <><Square size={13}/> Stop</>
+                : <><Mic size={14}/> Dictate</>}
+          </button>
+          <button className="btn-ink" onClick={()=>fileComplaint()} disabled={busy||!draft.trim()} style={{ marginLeft:"auto" }}>
+            {busy ? <><Activity size={14} className="blink"/> Routing…</> : <><Send size={14}/> Enter into record</>}
+          </button>
+        </div>
+
+        <div style={{ marginTop:28 }}>
+          <div className="eyebrow" style={{ marginBottom:6 }}>Precedents on record</div>
+          <div>
+            {SAMPLES.map((s,i)=>(
+              <button key={i} className="sample-item" onClick={()=>{ setLang(s.lang); setDraft(s.text); }}>
+                <span className="sample-idx">{String.fromCharCode(97+i)}.</span>
+                <span>{s.text}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* RIGHT — the routing slip */}
+      <section>
+        <div className="card-flat" style={{ position:"relative" }}>
+          <div className="slip-header">Routing slip — Form NL-7A</div>
+          <div style={{ padding:"6px 16px 20px" }}>
+            {!routeResult ? (
+              <>
+                {["Department","Ward","Urgency","Service window"].map(k=>(
+                  <div key={k} className="slip-row">
+                    <span className="slip-key label-mono">{k}</span>
+                    <span className="u-mono" style={{ color:C.inkFaint }}>——</span>
+                  </div>
+                ))}
+                <p className="u-serif" style={{ fontStyle:"italic", fontSize:13.5, color:C.inkSoft, lineHeight:1.6, marginTop:16 }}>
+                  On entry, the grievance is classified, routed and assigned a service window. If the department lets that
+                  window lapse, the matter escalates outward — public flag, then an RTI on record, then to the ward
+                  representative. Nothing here can be quietly ignored.
+                </p>
+              </>
+            ) : (
+              <>
+                <div className="slip-row">
+                  <span className="slip-key label-mono">Department</span>
+                  <span className="u-serif" style={{ fontSize:16, fontWeight:600, color:C.ink,
+                    textDecoration:"underline", textDecorationColor:C.blue, textUnderlineOffset:3 }}>
+                    {DEPTS[routeResult.deptId].name}
+                  </span>
+                </div>
+                <div className="slip-row">
+                  <span className="slip-key label-mono">Ward &amp; rep.</span>
+                  <span className="u-sans" style={{ fontSize:13.5 }}>{WARDS[routeResult.ward].name} · {WARDS[routeResult.ward].rep}</span>
+                </div>
+                <div className="slip-row">
+                  <span className="slip-key label-mono">Urgency</span>
+                  <span className="chip-urg" style={{ color:URG_COLOR[routeResult.urgency] }}>{routeResult.urgency}</span>
+                </div>
+                <div className="slip-row">
+                  <span className="slip-key label-mono">Service window</span>
+                  <span className="u-sans" style={{ fontSize:13.5 }}>{DEPTS[routeResult.deptId].sla} days, then escalates</span>
+                </div>
+                <div style={{ marginTop:14, padding:"11px 13px", background:C.paper2, border:`1px solid ${C.rule}` }}>
+                  <span className="label-mono" style={{ color:C.red }}>Grounds ▸ </span>
+                  <span className="u-serif" style={{ fontStyle:"italic", fontSize:13.5, color:C.ink }}>{routeResult.reason}</span>
+                </div>
+                <div className="u-serif" style={{ fontStyle:"italic", fontSize:14, color:C.green, marginTop:14,
+                  display:"flex", alignItems:"center", gap:8 }}>
+                  <CheckCircle2 size={15}/> Entered into record. Opening the escalation register…
+                </div>
+
+                {/* rubber stamp overlapping the slip's bottom-right corner */}
+                <div className="stamp" style={{ right:-14, bottom:-26 }}>
+                  <span>Filed<br/>Nyayaloop Registry<br/>Day {day}</span>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      </section>
+    </div>
+  );
 }
 
-/* ───── PRESSURE CHAIN (signature) ───── */
+/* ───── ESCALATION REGISTER (signature) ───── */
 function GraphPanel({ stats, complaints, selected, setSelectedId, resolve, day, openRTI, graphAvailable, graphStats }) {
-  const W=720, H=300, midY=120;
-  const cit={x:60}, dept={x:185};
-  const stageX=[330,455,575,680];
   const sel = selected && selected.status==="open" ? selected : null;
-  const tipX = sel ? stageX[sel.escLevel] : null;   // x of the current pressure front
   const open = complaints.filter(c=>c.status==="open");
   /* Optional-chaining + default so a null / partial payload never throws. */
   const underPressure = (graphStats?.officialsUnderPressure ?? []).slice(0, 4);
 
   return (
-    <div className="nl-split wide">
-      <div style={{ background:GRAD.panel, boxShadow:"0 24px 60px -34px rgba(0,0,0,.9), 0 1px 0 0 rgba(255,255,255,.045) inset", border:`1px solid ${T.line}`, borderRadius:14, padding:14 }}>
-        {/* Neo4j graph mirror — an optional enrichment. Live when connected;
-            gracefully shows "unavailable" on 503 (Aura paused) without blanking. */}
-        <div style={{ display:"flex", alignItems:"center", gap:8, padding:"2px 4px 8px", fontSize:10, color:T.faint }}>
-          <span style={{ width:7, height:7, borderRadius:9, background:graphAvailable?T.teal:T.faint }}/>
-          {graphAvailable
-            ? <span>Neo4j graph mirror <span style={{ color:T.teal }}>live</span>
-                {underPressure.length>0 && <> · pressure on {underPressure.map(o=>o?.official).filter(Boolean).join(", ")}</>}
-              </span>
-            : <span>Neo4j graph mirror unavailable — showing the local pressure view</span>}
-        </div>
-        {/* live pressure readout — names the current stage in plain words */}
+    <div style={{ display:"grid", gap:26, gridTemplateColumns:"minmax(0,1.35fr) minmax(0,1fr)" }} className="regrid">
+      <style>{`@media (max-width:820px){.regrid{grid-template-columns:1fr!important}}`}</style>
+
+      {/* LEFT — the register */}
+      <section>
+        <div className="eyebrow" style={{ marginBottom:4 }}>Form NL-9 · Escalation register</div>
+        <h2 className="u-serif" style={{ fontSize:24, fontWeight:600, margin:"0 0 6px" }}>
+          {sel ? <>Case <span className="u-mono" style={{ fontSize:18 }}>{sel.id}</span></> : "Escalation register"}
+        </h2>
+
+        {/* pressure readout / instruction */}
         {sel ? (
-          <div style={{ display:"flex", alignItems:"center", gap:11, padding:"2px 4px 12px", flexWrap:"wrap" }}>
-            <span className="nl-mono" style={{ fontSize:9.5, letterSpacing:1.5, color:T.faint }}>PRESSURE</span>
-            <span className="nl-display" style={{ fontSize:16, fontWeight:700, lineHeight:1, color:STAGES[sel.escLevel].color, textShadow:`0 0 20px ${STAGES[sel.escLevel].color}66` }}>
+          <div style={{ display:"flex", alignItems:"baseline", gap:12, flexWrap:"wrap", marginBottom:16 }}>
+            <span className="label-mono">Current standing</span>
+            <span className="u-serif" style={{ fontSize:18, fontWeight:600, color:STAGES[sel.escLevel].color }}>
               {STAGES[sel.escLevel].label}
             </span>
-            <span style={{ fontSize:11.5, color:T.dim }}>· {STAGES[sel.escLevel].cost}</span>
-            <span className="nl-mono" style={{ marginLeft:"auto", fontSize:10, color:T.faint }}>
-              {sel.id} · {day - sel.filedDay}d unaddressed
+            <span className="u-serif" style={{ fontStyle:"italic", fontSize:13.5, color:C.inkSoft }}>— {STAGES[sel.escLevel].cost}</span>
+            <span className="u-mono" style={{ marginLeft:"auto", fontSize:11, letterSpacing:1, color:C.inkFaint }}>
+              {day - sel.filedDay}d unaddressed
             </span>
           </div>
         ) : (
-          <div style={{ fontSize:11.5, color:T.dim, padding:"2px 4px 12px", lineHeight:1.5 }}>
-            Escalation climbs <span style={{ color:T.gold }}>outward</span> — each ignored day makes the department pay more. Pick an open complaint to trace its pressure.
-          </div>
+          <p className="u-serif" style={{ fontStyle:"italic", fontSize:14, color:C.inkSoft, lineHeight:1.6, marginBottom:16 }}>
+            Escalation climbs outward — each ignored day makes the department pay more. Select an open case from the docket to trace its standing.
+          </p>
         )}
-        <svg viewBox={`0 0 ${W} ${H}`} style={{ width:"100%", height:"auto" }}>
-          <defs>
-            {/* the heat scale — one continuous gradient mapped to absolute x, so the
-                filled pipe always shows the correct slice of cool→hot */}
-            <linearGradient id="nl-heat" gradientUnits="userSpaceOnUse" x1={cit.x} y1="0" x2={stageX[3]} y2="0">
-              <stop offset="0%" stopColor={T.teal}/>
-              <stop offset="20%" stopColor="#38c8c0"/>
-              <stop offset="44%" stopColor={T.gold}/>
-              <stop offset="64%" stopColor={T.orange}/>
-              <stop offset="83%" stopColor={T.red}/>
-              <stop offset="100%" stopColor={T.violet}/>
-            </linearGradient>
-            <filter id="nl-glow" x="-70%" y="-70%" width="240%" height="240%">
-              <feGaussianBlur stdDeviation="4.5" result="b"/>
-              <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
-            </filter>
-          </defs>
 
-          {/* base track */}
-          <line x1={cit.x} y1={midY} x2={stageX[3]} y2={midY} stroke={T.line} strokeWidth={3} strokeLinecap="round" opacity={0.5}/>
-
-          {/* heated pipe — fills only up to the current pressure front */}
-          {sel && <>
-            <line x1={cit.x} y1={midY} x2={tipX} y2={midY} stroke="url(#nl-heat)" strokeWidth={5} strokeLinecap="round" filter="url(#nl-glow)" opacity={0.9}/>
-            <line x1={cit.x} y1={midY} x2={tipX} y2={midY} stroke="url(#nl-heat)" strokeWidth={2} strokeLinecap="round" className="flow"/>
-          </>}
-
-          {/* threshold — where the grievance leaves the bureaucracy and goes public */}
-          <line x1={257} y1={midY-40} x2={257} y2={midY+40} stroke={T.line} strokeWidth={1} strokeDasharray="3 4" opacity={0.75}/>
-          <text x={257} y={midY-46} fill={T.faint} fontSize="7.5" textAnchor="middle" fontFamily="monospace" letterSpacing="0.4">leaves the bureaucracy</text>
-
-          {/* citizen — cool origin */}
-          <circle cx={cit.x} cy={midY} r={18} fill="#0f1c1b" stroke={T.teal} strokeWidth={1.8}/>
-          <text x={cit.x} y={midY+3.5} fill={T.teal} fontSize="8.5" textAnchor="middle" fontFamily="monospace" fontWeight="700">YOU</text>
-          <text x={cit.x} y={midY+34} fill={T.faint} fontSize="8" textAnchor="middle" fontFamily="monospace">citizen</text>
-
-          {/* department — the internal boundary */}
-          <circle cx={dept.x} cy={midY} r={26} fill={T.panel2} stroke={sel?DEPTS[sel.deptId].hue:T.line} strokeWidth={sel?2.4:1.5}/>
-          <text x={dept.x} y={midY-3} fill={T.text} fontSize="9.5" textAnchor="middle" fontFamily="monospace" fontWeight="600">{sel?DEPTS[sel.deptId].name.split(" ")[0]:"Dept"}</text>
-          <text x={dept.x} y={midY+10} fill={T.dim} fontSize="8" textAnchor="middle" fontFamily="monospace">{sel?DEPTS[sel.deptId].sla+"d SLA":"—"}</text>
-          <text x={dept.x} y={midY+42} fill={T.faint} fontSize="8" textAnchor="middle" fontFamily="monospace">internal</text>
-
-          {/* outward pressure stages */}
+        {/* the 4 stamped stages */}
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:10 }}>
           {STAGES.map((s,i)=>{
-            const x=stageX[i], reached=sel&&sel.escLevel>=i, tip=sel&&sel.escLevel===i;
-            const key=["FILE","FLAG","RTI","REP"][i], r=tip?24:reached?22:20;
+            const reached = sel && sel.escLevel>=i;
+            const current = sel && sel.escLevel===i;
             return (
-              <g key={s.key}>
-                {tip && <>
-                  <circle cx={x} cy={midY} r={22} fill="none" stroke={s.color} strokeWidth={2} className="nl-sonar"/>
-                  <circle cx={x} cy={midY} r={22} fill="none" stroke={s.color} strokeWidth={2} className="nl-sonar" style={{ animationDelay:".95s" }}/>
-                </>}
-                <circle cx={x} cy={midY} r={r} fill={reached?s.color:T.panel2}
-                  stroke={reached?s.color:T.line} strokeWidth={reached?2:1.4}
-                  filter={reached?"url(#nl-glow)":undefined} opacity={reached?1:0.6}/>
-                <text x={x} y={midY+3.5} fill={reached?"#0b0a14":T.faint} fontSize="9" textAnchor="middle" fontFamily="monospace" fontWeight="700">{key}</text>
-                <text x={x} y={midY-32} fill={reached?s.color:T.faint} fontSize="9" textAnchor="middle" fontFamily="monospace" fontWeight={reached?"600":"400"}>{s.label}</text>
-                <text x={x} y={midY+40} fill={reached?T.dim:T.faint} fontSize="7.8" textAnchor="middle" fontFamily="monospace">{s.cost}</text>
-              </g>
+              <div key={s.key} className={`reg-cell ${reached ? "reg-cell--reached" : ""}`}>
+                <div className="label-mono" style={{ color:reached ? s.color : C.inkFaint }}>
+                  {i===0?"I":i===1?"II":i===2?"III":"IV"}
+                </div>
+                <div className="u-serif" style={{ fontSize:14, fontWeight:600, marginTop:4,
+                  color:reached ? C.ink : C.inkFaint }}>{s.label}</div>
+                <div className="u-serif" style={{ fontStyle:"italic", fontSize:11.5, color:reached ? C.inkSoft : C.inkFaint, marginTop:3 }}>
+                  {s.cost}
+                </div>
+                {reached && (
+                  <div className="u-mono" style={{ marginTop:9, fontSize:8.5, letterSpacing:"1px",
+                    color:s.color, border:`1px solid ${s.color}`, padding:"2px 5px", display:"inline-block",
+                    transform:"rotate(-2deg)" }}>
+                    {current ? "● CURRENT" : "ON RECORD"}
+                  </div>
+                )}
+              </div>
             );
           })}
-        </svg>
+        </div>
 
-        {/* heat scale legend — the cool→hot metaphor made explicit */}
-        <div className="nl-mono" style={{ display:"flex", alignItems:"center", gap:9, padding:"8px 6px 2px", fontSize:9, color:T.faint }}>
-          <span>cool · internal</span>
-          <span style={{ flex:1, height:4, borderRadius:9, background:GRAD.pressure }}/>
-          <span>hot · electoral</span>
+        {/* graph mirror status — real functionality, degrades gracefully */}
+        <div className="label-mono" style={{ marginTop:16, display:"flex", alignItems:"center", gap:8, color:C.inkFaint }}>
+          <span style={{ width:7, height:7, borderRadius:9, background:graphAvailable?C.green:C.ruleDark, display:"inline-block" }}/>
+          {graphAvailable
+            ? <span>Graph mirror live{underPressure.length>0 && <> · pressure on {underPressure.map(o=>o?.official).filter(Boolean).join(", ")}</>}</span>
+            : <span>Graph mirror idle — showing local register</span>}
         </div>
 
         {sel && sel.escLevel>=2 && (
-          <button className="nl-btn" onClick={()=>openRTI(sel)}
-            style={{ marginTop:6, display:"flex", alignItems:"center", gap:8, background:T.bg, color:T.red, border:`1px solid ${T.red}`, borderRadius:9, padding:"9px 13px", cursor:"pointer", fontSize:11.5 }}>
-            <Scale size={14}/> RTI auto-filed for {sel.id} — view the legal record
+          <button className="btn-outline" onClick={()=>openRTI(sel)}
+            style={{ marginTop:16, borderColor:C.red, color:C.red }}>
+            <Scale size={14}/> RTI on record for {sel.id} — view instrument
           </button>
         )}
-      </div>
+      </section>
 
-      {/* queue */}
-      <div style={{ background:GRAD.panel, boxShadow:"0 24px 60px -34px rgba(0,0,0,.9), 0 1px 0 0 rgba(255,255,255,.045) inset", border:`1px solid ${T.line}`, borderRadius:14, padding:14, maxHeight:430, overflow:"auto" }}>
-        <div className="nl-display" style={{ fontSize:12.5, fontWeight:600, color:T.text, marginBottom:12, display:"flex", alignItems:"center", gap:7 }}>Open complaints <span className="nl-mono" style={{ fontSize:10.5, color:"#0b0a14", background:GRAD.gold, borderRadius:999, padding:"1px 8px", fontWeight:700 }}>{open.length}</span></div>
-        {open.length===0 && <div style={{ color:T.faint, fontSize:12 }}>All clear. File one, then run the engine to watch it escalate outward.</div>}
-        {open.sort((a,b)=>b.escLevel-a.escLevel).map(c=>{
-          const isSel = selected && selected.id===c.id, stage=STAGES[c.escLevel];
-          return (
-            <div key={c.id} className="nl-card" role="button" tabIndex={0} aria-pressed={isSel}
-              aria-label={`${c.summary} — ${DEPTS[c.deptId].name}, ${WARDS[c.ward].name}, ${c.urgency} urgency`}
-              onClick={()=>setSelectedId(c.id)}
-              onKeyDown={e=>{ if(e.target===e.currentTarget && (e.key==="Enter"||e.key===" ")){ e.preventDefault(); setSelectedId(c.id); } }}
-              style={{ border:`1px solid ${T.line}`, background:isSel?T.panel2:T.bg, boxShadow:isSel?`inset 4px 0 0 ${DEPTS[c.deptId].hue}`:undefined, borderRadius:10, padding:11, marginBottom:9, cursor:"pointer" }}>
-              <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:6 }}>
-                <span style={{ width:7, height:7, borderRadius:9, background:DEPTS[c.deptId].hue }}/>
-                <span style={{ fontSize:10, color:T.dim }}>{DEPTS[c.deptId].name}</span>
-                <span style={{ fontSize:9.5, color:T.faint }}>· {WARDS[c.ward].name}</span>
-                <span style={{ marginLeft:"auto", fontSize:9.5, color:URG_COLOR[c.urgency], textTransform:"uppercase" }}>{c.urgency}</span>
-              </div>
-              <div style={{ fontSize:12, lineHeight:1.5, marginBottom:8 }}>{c.summary}</div>
-              <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-                <span style={{ fontSize:9.5, color:stage.color, display:"flex", alignItems:"center", gap:4 }}><stage.Icon size={11}/> {stage.label}</span>
-                <span style={{ fontSize:9.5, color:T.faint }}>· {day-c.filedDay}d</span>
-                <button className="nl-btn" onClick={e=>{ e.stopPropagation(); resolve(c.id); }} aria-label={`Mark ${c.id} resolved`}
-                  style={{ marginLeft:"auto", background:T.panel2, color:T.teal, border:`1px solid ${T.line}`, borderRadius:7, padding:"5px 11px", cursor:"pointer", fontSize:10 }}>resolve</button>
-              </div>
+      {/* RIGHT — the docket of open cases + timeline */}
+      <section>
+        <div className="eyebrow" style={{ marginBottom:8, display:"flex", alignItems:"center", gap:8 }}>
+          Open docket
+          <span className="u-mono" style={{ background:C.ink, color:C.paper, padding:"1px 7px", fontSize:10, letterSpacing:1 }}>
+            {String(open.length).padStart(2,"0")}
+          </span>
+        </div>
+
+        <div style={{ maxHeight:520, overflow:"auto", borderTop:`1.5px solid ${C.ink}` }}>
+          {open.length===0 && (
+            <div className="u-serif" style={{ fontStyle:"italic", fontSize:13.5, color:C.inkSoft, padding:"14px 4px" }}>
+              Docket clear. Enter a grievance, then run the engine to watch it escalate outward.
             </div>
-          );
-        })}
-        {selected && (
-          <div style={{ marginTop:12, borderTop:`1px solid ${T.line}`, paddingTop:12 }}>
-            <div style={{ fontSize:10, color:T.faint, marginBottom:8, letterSpacing:1 }}>TIMELINE · {selected.id}</div>
-            {selected.timeline.map((e,i)=>(
-              <div key={i} style={{ display:"flex", gap:9, marginBottom:8 }}>
-                <span style={{ width:8, height:8, marginTop:4, borderRadius:9, flexShrink:0,
-                  background:e.kind==="done"?T.teal:e.kind==="rti"?T.red:e.kind==="rep"?T.violet:e.kind==="flag"?T.orange:T.gold }}/>
-                <div><div style={{ fontSize:11.5, lineHeight:1.4 }}>{e.label}</div><div style={{ fontSize:9.5, color:T.faint }}>day {e.day}</div></div>
+          )}
+          {open.sort((a,b)=>b.escLevel-a.escLevel).map(c=>{
+            const isSel = selected && selected.id===c.id, stage=STAGES[c.escLevel];
+            return (
+              <div key={c.id} className={`case-row ${isSel ? "case-row--sel" : ""}`} role="button" tabIndex={0} aria-pressed={isSel}
+                aria-label={`${c.summary} — ${DEPTS[c.deptId].name}, ${WARDS[c.ward].name}, ${c.urgency} urgency`}
+                onClick={()=>setSelectedId(c.id)}
+                onKeyDown={e=>{ if(e.target===e.currentTarget && (e.key==="Enter"||e.key===" ")){ e.preventDefault(); setSelectedId(c.id); } }}>
+                <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:5 }}>
+                  <span className="u-mono" style={{ fontSize:10.5, letterSpacing:1, color:C.ink }}>{c.id}</span>
+                  <span className="label-mono" style={{ color:DEPTS[c.deptId].hue }}>{DEPTS[c.deptId].name}</span>
+                  <span className="u-mono" style={{ fontSize:9.5, color:C.inkFaint }}>· {WARDS[c.ward].name}</span>
+                  <span className="u-mono" style={{ marginLeft:"auto", fontSize:9.5, letterSpacing:1, textTransform:"uppercase", color:URG_COLOR[c.urgency] }}>{c.urgency}</span>
+                </div>
+                <div className="u-serif" style={{ fontSize:14.5, lineHeight:1.4, marginBottom:8, color:C.ink }}>{c.summary}</div>
+                <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                  <span className="label-mono" style={{ color:stage.color, display:"flex", alignItems:"center", gap:5 }}>
+                    <stage.Icon size={11}/> {stage.label}
+                  </span>
+                  <span className="u-mono" style={{ fontSize:9.5, color:C.inkFaint }}>· {day-c.filedDay}d</span>
+                  <button className="btn-outline" onClick={e=>{ e.stopPropagation(); resolve(c.id); }} aria-label={`Mark ${c.id} resolved`}
+                    style={{ marginLeft:"auto", padding:"4px 10px", fontSize:10, borderColor:C.green, color:C.green }}>Resolve</button>
+                </div>
               </div>
-            ))}
+            );
+          })}
+        </div>
+
+        {selected && (
+          <div style={{ marginTop:18 }}>
+            <div className="eyebrow" style={{ marginBottom:8 }}>Proceedings · {selected.id}</div>
+            <div style={{ borderTop:`1px solid ${C.rule}` }}>
+              {selected.timeline.map((e,i)=>(
+                <div key={i} style={{ display:"flex", gap:12, alignItems:"baseline", padding:"8px 2px", borderBottom:`1px solid ${C.rule}` }}>
+                  <span className="u-mono" style={{ fontSize:10.5, letterSpacing:1, color:C.inkFaint, width:52, flex:"none" }}>DAY {String(e.day).padStart(2,"0")}</span>
+                  <span style={{ width:8, height:8, borderRadius:9, flex:"none", alignSelf:"center",
+                    background:e.kind==="done"?C.green:e.kind==="rti"?C.red:e.kind==="rep"?C.ink:e.kind==="flag"?C.blue:C.amber }}/>
+                  <span className="u-serif" style={{ fontSize:14, color:C.ink }}>{e.label}</span>
+                </div>
+              ))}
+            </div>
           </div>
         )}
-      </div>
+      </section>
     </div>
   );
 }
 
-/* ───── PATTERN, NOT INCIDENT (the wow) ───── */
+/* ───── CASE INDEX (pattern, not incident) ───── */
 function Pattern({ wardStats, best, worst }) {
   const data = wardStats.filter(w=>w.total).map(w=>({ name:w.name, rate:w.rate, open:w.open,
-    hue:w.rate>=70?T.teal:w.rate>=40?T.gold:T.red }));
+    hue:w.rate>=70?C.green:w.rate>=40?C.amber:C.red }));
+  const rateColor = (r) => r>=70?C.green:r>=40?C.amber:C.red;
+  const rows = wardStats.filter(w=>w.total);
   return (
     <div>
+      <div className="eyebrow" style={{ marginBottom:4 }}>Form NL-12 · Comparative case index</div>
+      <h2 className="u-serif" style={{ fontSize:24, fontWeight:600, margin:"0 0 16px" }}>Pattern, not incident</h2>
+
       {worst && best && (
-        <div style={{ background:`linear-gradient(120deg,#24101c 0%,#1c0a12 50%,#12060c 100%)`, border:`1px solid ${T.red}`, boxShadow:`0 24px 60px -30px ${T.red}, 0 0 0 1px rgba(255,77,109,.08) inset`, borderRadius:14, padding:20, marginBottom:16, display:"flex", alignItems:"center", gap:18 }}>
-          <div style={{ width:52, height:52, flex:"none", borderRadius:13, display:"grid", placeItems:"center", background:`linear-gradient(135deg,${T.red},${T.magenta})`, boxShadow:`0 0 28px -6px ${T.red}` }}>
-            <ShieldAlert size={28} color="#fff"/>
-          </div>
+        <div className="card-flat" style={{ borderColor:C.red, boxShadow:`3px 3px 0 ${C.ruleDark}`,
+          borderLeft:`4px solid ${C.red}`, padding:18, marginBottom:22, display:"flex", gap:16, alignItems:"flex-start" }}>
+          <ShieldAlert size={26} color={C.red} style={{ flex:"none", marginTop:2 }}/>
           <div>
-            <div className="nl-display" style={{ fontSize:10.5, color:T.red, letterSpacing:2, marginBottom:5, fontWeight:600 }}>THE PATTERN</div>
-            <div style={{ fontSize:15.5, fontWeight:600, lineHeight:1.45 }}>
-              {worst.name} sits at <span style={{ color:T.red }}>{worst.rate}%</span> resolved, {worst.open} open, avg age {worst.avgAge}d —
-              while {best.name} clears at <span style={{ color:T.teal }}>{best.rate}%</span>.
+            <div className="label-mono" style={{ color:C.red, marginBottom:6 }}>Finding of record</div>
+            <div className="u-serif" style={{ fontSize:17, fontWeight:600, lineHeight:1.5, color:C.ink }}>
+              {worst.name} stands at <span style={{ color:C.red }}>{worst.rate}%</span> resolved, {worst.open} open, average age {worst.avgAge} days —
+              while {best.name} clears at <span style={{ color:C.green }}>{best.rate}%</span>.
             </div>
-            <div style={{ fontSize:11.5, color:T.dim, marginTop:5 }}>
-              One complaint is ignorable. This isn't. {worst.rtis} RTIs are now on record against {WARDS[worst.id].rep}.
+            <div className="u-serif" style={{ fontStyle:"italic", fontSize:13.5, color:C.inkSoft, marginTop:7 }}>
+              One complaint is ignorable. This is not. {worst.rtis} RTIs are now on record against {WARDS[worst.id].rep}.
             </div>
           </div>
         </div>
       )}
-      <div style={{ background:GRAD.panel, boxShadow:"0 24px 60px -34px rgba(0,0,0,.9), 0 1px 0 0 rgba(255,255,255,.045) inset", border:`1px solid ${T.line}`, borderRadius:14, padding:18, marginBottom:16 }}>
-        <div className="nl-display" style={{ fontSize:13.5, fontWeight:600, color:T.text, marginBottom:16 }}>Resolution rate by ward <span style={{ color:T.dim, fontWeight:400, fontSize:12 }}>— accountability, aggregated</span></div>
+
+      {/* case index table */}
+      <div className="card-flat" style={{ padding:"4px 14px 8px", marginBottom:22, overflowX:"auto" }}>
+        <table className="index-table">
+          <thead>
+            <tr>
+              <th>Ward</th><th>Representative</th><th style={{ textAlign:"right" }}>Resolved</th>
+              <th style={{ textAlign:"right" }}>Open</th><th style={{ textAlign:"right" }}>Avg age</th>
+              <th style={{ textAlign:"right" }}>RTIs</th><th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map(w=>(
+              <tr key={w.id} style={ w===worst ? { boxShadow:`inset 4px 0 0 ${C.red}` } : undefined }>
+                <td className="u-serif" style={{ fontSize:15.5, fontWeight:600 }}>{w.name}</td>
+                <td className="u-sans" style={{ fontSize:13, color:C.inkSoft }}>{w.rep}</td>
+                <td className="u-serif" style={{ fontSize:20, fontWeight:600, textAlign:"right", color:rateColor(w.rate) }}>{w.rate}%</td>
+                <td className="u-mono" style={{ fontSize:13, textAlign:"right" }}>{w.open}</td>
+                <td className="u-mono" style={{ fontSize:13, textAlign:"right" }}>{w.avgAge}d</td>
+                <td className="u-mono" style={{ fontSize:13, textAlign:"right", color:w.rtis?C.red:C.inkFaint }}>{w.rtis}</td>
+                <td style={{ textAlign:"right" }}>
+                  {w===worst && (
+                    <span className="u-mono" style={{ fontSize:9, letterSpacing:1, color:C.red, border:`1px solid ${C.red}`,
+                      padding:"2px 6px", display:"inline-block", transform:"rotate(-2deg)" }}>Flagged</span>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* flat ledger chart */}
+      <div className="card-flat" style={{ padding:18 }}>
+        <div className="label-mono" style={{ marginBottom:14 }}>Resolution rate by ward — accountability, aggregated</div>
         <div style={{ height:220 }} role="img"
           aria-label={`Resolution rate by ward — ${data.map(d=>`${d.name} ${d.rate} percent`).join(", ")}`}>
           <ResponsiveContainer>
             <BarChart data={data} margin={{ top:18, right:8, left:-18, bottom:0 }}>
-              <XAxis dataKey="name" tick={{ fill:T.dim, fontSize:11, fontFamily:"monospace" }} axisLine={{ stroke:T.line }} tickLine={false}/>
-              <YAxis domain={[0,100]} tick={{ fill:T.faint, fontSize:10, fontFamily:"monospace" }} axisLine={false} tickLine={false}/>
-              <Tooltip cursor={{ fill:"#ffffff08" }} contentStyle={{ background:T.panel2, border:`1px solid ${T.line}`, borderRadius:8, fontFamily:"monospace", fontSize:12 }} formatter={(v)=>[`${v}%`,"resolved"]}/>
-              <Bar dataKey="rate" radius={[6,6,0,0]}>
-                <LabelList dataKey="rate" position="top" formatter={(v)=>`${v}%`} fill={T.dim} fontSize={10} fontFamily="monospace"/>
+              <XAxis dataKey="name" tick={{ fill:C.inkSoft, fontSize:11, fontFamily:"'IBM Plex Mono',monospace" }} axisLine={{ stroke:C.ink }} tickLine={false}/>
+              <YAxis domain={[0,100]} tick={{ fill:C.inkFaint, fontSize:10, fontFamily:"'IBM Plex Mono',monospace" }} axisLine={false} tickLine={false}/>
+              <Tooltip cursor={{ fill:"rgba(28,26,21,0.06)" }} contentStyle={{ background:C.paperCard, border:`1px solid ${C.ink}`, borderRadius:0, fontFamily:"'IBM Plex Mono',monospace", fontSize:12, color:C.ink }} formatter={(v)=>[`${v}%`,"resolved"]}/>
+              <Bar dataKey="rate" radius={[0,0,0,0]}>
+                <LabelList dataKey="rate" position="top" formatter={(v)=>`${v}%`} fill={C.inkSoft} fontSize={11} fontFamily="'IBM Plex Mono',monospace"/>
                 {data.map((d,i)=><Cell key={i} fill={d.hue}/>)}
               </Bar>
             </BarChart>
           </ResponsiveContainer>
         </div>
       </div>
-      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(210px,1fr))", gap:12 }}>
-        {wardStats.filter(w=>w.total).map(w=>(
-          <div key={w.id} style={{ background:"linear-gradient(180deg,#15151b,#101014)", boxShadow:w===worst?`0 16px 40px -26px ${T.red}`:"0 14px 36px -24px rgba(0,0,0,.95)", border:`1px solid ${w===worst?T.red:T.line}`, borderRadius:11, padding:14 }}>
-            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:6 }}>
-              <span className="nl-display" style={{ fontSize:14, fontWeight:600 }}>{w.name}</span>
-              <span className="nl-mono" style={{ fontSize:24, fontWeight:700, color:w.rate>=70?T.teal:w.rate>=40?T.gold:T.red, textShadow:`0 0 20px ${(w.rate>=70?T.teal:w.rate>=40?T.gold:T.red)}55` }}>{w.rate}%</span>
-            </div>
-            <div style={{ fontSize:10.5, color:T.faint, marginBottom:8 }}>{w.rep}</div>
-            <div style={{ display:"flex", gap:14, fontSize:10.5, color:T.dim }}>
-              <span>{w.open} open</span><span>avg {w.avgAge}d</span>
-              <span style={{ color:w.rtis?T.red:T.faint }}>{w.rtis} RTIs</span>
-            </div>
-          </div>
-        ))}
-      </div>
     </div>
   );
 }
 
-/* ───── RTI DRAWER ───── */
-function RTIDrawer({ complaint, rtiText, rtiBusy, enhanceRTI, close }) {
+/* ───── RTI INSTRUMENT (drawer) ───── */
+function RTIDrawer({ complaint, rtiText, rtiBusy, enhanceRTI, close, day }) {
   /* Escape closes the drawer — a standard modal escape route (a11y). */
   useEffect(() => {
     const onKey = (e) => { if (e.key === "Escape") close(); };
@@ -911,30 +915,42 @@ function RTIDrawer({ complaint, rtiText, rtiBusy, enhanceRTI, close }) {
   }, [close]);
   if (!complaint) return null;
   return (
-    <div onClick={close} style={{ position:"fixed", inset:0, background:"#000c", display:"flex", justifyContent:"flex-end", zIndex:50 }}>
+    <div onClick={close} style={{ position:"fixed", inset:0, background:"rgba(28,26,21,0.55)", display:"flex", justifyContent:"flex-end", zIndex:50 }}>
       <div onClick={e=>e.stopPropagation()} role="dialog" aria-modal="true" aria-label={`RTI application for ${complaint.id}`}
-        style={{ width:"min(520px,94vw)", height:"100%", background:`linear-gradient(180deg,#181626,#0d0c17)`, borderLeft:`1px solid ${T.red}44`, boxShadow:`-30px 0 80px -30px rgba(0,0,0,.9), -1px 0 0 0 ${T.red}22`, padding:22, overflow:"auto" }}>
-        <div style={{ display:"flex", alignItems:"center", gap:11, marginBottom:6 }}>
-          <div style={{ width:34, height:34, flex:"none", borderRadius:9, display:"grid", placeItems:"center", background:`linear-gradient(135deg,${T.red},${T.magenta})`, boxShadow:`0 0 20px -6px ${T.red}` }}>
-            <Scale size={17} color="#fff"/>
+        style={{ width:"min(560px,96vw)", height:"100%", background:C.paperCard, borderLeft:`1px solid ${C.ink}`,
+          boxShadow:`-3px 0 0 ${C.ruleDark}`, overflow:"auto" }} className="page-rules">
+        <div style={{ padding:22 }}>
+          <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:4 }}>
+            <Scale size={18} color={C.red}/>
+            <div className="u-serif" style={{ fontSize:20, fontWeight:600 }}>
+              RTI application · <span className="u-mono" style={{ fontSize:15 }}>{complaint.id}</span>
+            </div>
+            <button className="btn-outline" onClick={close} style={{ marginLeft:"auto", padding:"6px 12px" }}>Close</button>
           </div>
-          <div className="nl-display" style={{ fontSize:15, fontWeight:600 }}>RTI application · <span className="nl-mono">{complaint.id}</span></div>
-          <button className="nl-btn" onClick={close} style={{ marginLeft:"auto", background:"none", border:`1px solid ${T.line}`, color:T.dim, borderRadius:7, padding:"4px 10px", cursor:"pointer", fontSize:12 }}>close</button>
+          <div className="eyebrow" style={{ marginBottom:16 }}>Instrument under the Right to Information Act, 2005</div>
+
+          <p className="u-serif" style={{ fontStyle:"italic", fontSize:13.5, color:C.inkSoft, lineHeight:1.6, marginBottom:16 }}>
+            Auto-drafted when the {DEPTS[complaint.deptId].name} let its {DEPTS[complaint.deptId].sla}-day window lapse.
+            This creates a legal obligation to respond within 30 days.
+          </p>
+
+          <div style={{ display:"flex", gap:12, marginBottom:16 }}>
+            <button className="btn-outline" onClick={()=>navigator.clipboard && navigator.clipboard.writeText(rtiText)}>
+              <Copy size={13}/> Copy
+            </button>
+            <button className="btn-ink" onClick={()=>enhanceRTI(complaint)} disabled={rtiBusy}>
+              {rtiBusy ? <><Activity size={13} className="blink"/> Refining…</> : <><Sparkles size={13}/> Refine with AI</>}
+            </button>
+          </div>
+
+          <div style={{ position:"relative" }}>
+            <pre className="u-mono" style={{ whiteSpace:"pre-wrap", background:C.paper, border:`1px solid ${C.ink}`,
+              padding:20, fontSize:12, lineHeight:1.7, color:C.ink, margin:0 }}>{rtiText}</pre>
+            <div className="stamp" style={{ right:10, bottom:10, width:104, height:104 }}>
+              <span>Registered<br/>RTI · Day {day}<br/>NL Registry</span>
+            </div>
+          </div>
         </div>
-        <div style={{ fontSize:11, color:T.faint, marginBottom:14 }}>
-          Auto-drafted under the RTI Act, 2005 when the {DEPTS[complaint.deptId].name} missed its {DEPTS[complaint.deptId].sla}-day window. This creates a legal obligation to respond within 30 days.
-        </div>
-        <div style={{ display:"flex", gap:10, marginBottom:12 }}>
-          <button className="nl-btn" onClick={()=>navigator.clipboard && navigator.clipboard.writeText(rtiText)}
-            style={{ display:"flex", alignItems:"center", gap:7, background:T.panel2, color:T.text, border:`1px solid ${T.line}`, borderRadius:8, padding:"8px 12px", cursor:"pointer", fontSize:11.5 }}>
-            <Copy size={13}/> Copy
-          </button>
-          <button className="nl-btn" onClick={()=>enhanceRTI(complaint)} disabled={rtiBusy}
-            style={{ display:"flex", alignItems:"center", gap:7, background:rtiBusy?T.panel2:`linear-gradient(135deg,${T.gold},${T.goldHi})`, color:rtiBusy?T.faint:"#000", fontWeight:600, border:"none", borderRadius:8, padding:"8px 12px", cursor:rtiBusy?"default":"pointer", fontSize:11.5 }}>
-            {rtiBusy?<Activity size={13} className="escpulse"/>:<Sparkles size={13}/>}{rtiBusy?"Refining…":"Refine with AI"}
-          </button>
-        </div>
-        <pre style={{ whiteSpace:"pre-wrap", background:T.bg, border:`1px solid ${T.line}`, borderRadius:10, padding:16, fontSize:11.5, lineHeight:1.6, color:T.text, fontFamily:"'JetBrains Mono',monospace" }}>{rtiText}</pre>
       </div>
     </div>
   );
