@@ -172,15 +172,7 @@ Paper Trail is a working prototype, not a production civic system. It does not c
 
 ---
 
-## Built For
 
-**HackHazards '26** — organized by NAMESPACE Community.
-
-**Theme:** Public Systems, Governance & Civic Tech
-
-**Track:** Sarvam AI — Build AI Applications with Sarvam AI
-
----
 
 <div align="center">
 
